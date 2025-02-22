@@ -10,7 +10,6 @@ import serial
 
 from esp_flasher import const
 from esp_flasher.common import (
-    ESP32ChipInfo,
     Esp_flasherError,
     chip_run_stub,
     configure_write_flash_args,
@@ -20,18 +19,20 @@ from esp_flasher.common import (
 )
 
 from esp_flasher.helpers import list_serial_ports
+from esp_flasher.const import DEFAULT_BAUD_RATE
+
+# Execute or stop the logs
+RUN_LOG = True
 
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(prog=f"esp_flasher {const.__version__}")
     parser.add_argument("-p", "--port", help="Select the USB/COM port for uploading.")
     group = parser.add_mutually_exclusive_group(required=False)
-    group.add_argument("--esp8266", action="store_true")
-    group.add_argument("--esp32", action="store_true")
     group.add_argument(
         "--upload-baud-rate",
         type=int,
-        default=460800,
+        default=DEFAULT_BAUD_RATE,
         help="Baud rate to upload with (not for logging)",
     )
     parser.add_argument(
@@ -42,6 +43,9 @@ def parse_args(argv):
         "--no-erase", help="Do not erase flash before flashing", action="store_true"
     )
     parser.add_argument("--show-logs", help="Only show logs", action="store_true")
+    parser.add_argument(
+        "--info-dump", help="Only show device info", action="store_true"
+    )
 
     return parser.parse_args(argv[1:])
 
@@ -63,10 +67,18 @@ def select_port(args):
     return ports[0][0]
 
 
-def show_logs(serial_port):
+def stop_logs():
+    global RUN_LOG
+    RUN_LOG = False
+
+
+def show_logs(port):
     print("Showing logs:")
+    global RUN_LOG
+    RUN_LOG = True
+    serial_port = serial.Serial(port, baudrate=115200)
     with serial_port:
-        while True:
+        while RUN_LOG:
             try:
                 raw = serial_port.readline()
             except serial.SerialException:
@@ -80,77 +92,70 @@ def show_logs(serial_port):
                 print(message)
             except UnicodeEncodeError:
                 print(message.encode("ascii", "backslashreplace"))
+        serial_port.close()
 
 
-def run_esp_flasher(argv):
-    args = parse_args(argv)
-    port = select_port(args)
-
-    if args.show_logs:
-        serial_port = serial.Serial(port, baudrate=115200)
-        show_logs(serial_port)
-        return
-
-    chip = detect_chip(port, args.esp8266, args.esp32)
+def dump_info(port):
+    chip = detect_chip(port)
     info = read_chip_info(chip)
 
     print()
     print("Chip Info:")
     print(f" - Chip Family: {info.family}")
     print(f" - Chip Model: {info.model}")
-    if isinstance(info, ESP32ChipInfo):
-        print(f" - Number of Cores: {info.num_cores}")
-        print(f" - Max CPU Frequency: {info.cpu_frequency}")
-        print(f" - Has Bluetooth: {'YES' if info.has_bluetooth else 'NO'}")
-        print(f" - Has Embedded Flash: {'YES' if info.has_embedded_flash else 'NO'}")
-        print(
-            f" - Has Factory-Calibrated ADC: {'YES' if info.has_factory_calibrated_adc else 'NO'}"
-        )
-    else:
-        print(f" - Chip ID: {info.chip_id:08X}")
-
+    print(f" - Number of Cores: {info.num_cores}")
+    print(f" - Max CPU Frequency: {info.cpu_frequency}")
+    print(f" - Has Bluetooth: {'YES' if info.has_bluetooth else 'NO'}")
+    print(f" - Has Embedded Flash: {'YES' if info.has_embedded_flash else 'NO'}")
+    print(
+        f" - Has Factory-Calibrated ADC: {'YES' if info.has_factory_calibrated_adc else 'NO'}"
+    )
     print(f" - MAC Address: {info.mac}")
+
+    chip._port.close()
+
+
+def run(argv):
+    args = parse_args(argv)
+    port = select_port(args)
+
+    if args.show_logs:
+        show_logs(port)
+        return
+
+    if args.info_dump:
+        dump_info(port)
+        return
+
+    run_esp_flasher(port, args.firmware, args.upload_baud_rate, args.no_erase)
+
+
+def run_esp_flasher(port, firmware, baud_rate=DEFAULT_BAUD_RATE, no_erase=True):
+    chip = detect_chip(port)
 
     stub_chip = chip_run_stub(chip)
     flash_size = None
 
-    if args.upload_baud_rate != 115200:
+    if baud_rate != 115200:
         try:
-            stub_chip.change_baud(args.upload_baud_rate)
+            stub_chip.change_baud(baud_rate)
         except esptool.FatalError as err:
             raise Esp_flasherError(
                 f"Error changing ESP upload baud rate: {err}"
             ) from err
 
-        # Check if the higher baud rate works
-        try:
-            flash_size = detect_flash_size(stub_chip)
-        except Esp_flasherError:
-            # Go back to old baud rate by recreating chip instance
-            print(
-                f"Chip does not support baud rate {args.upload_baud_rate}, changing to 115200"
-            )
-            # pylint: disable=protected-access
-            stub_chip._port.close()
-            chip = detect_chip(port, args.esp8266, args.esp32)
-            stub_chip = chip_run_stub(chip)
-
-    if flash_size is None:
-        flash_size = detect_flash_size(stub_chip)
-
-    print(f" - Flash Size: {flash_size}")
-
-    mock_args = configure_write_flash_args(args.firmware)
+    mock_args = configure_write_flash_args(firmware)
 
     print(f" - Flash Mode: {mock_args.flash_mode}")
     print(f" - Flash Frequency: {mock_args.flash_freq.upper()}Hz")
+    print(f" - Flash Size: {mock_args.flash_size}")
 
     try:
-        stub_chip.flash_set_parameters(esptool.flash_size_bytes(flash_size))
+        stub_chip.flash_set_parameters(esptool.flash_size_bytes(mock_args.flash_size))
     except esptool.FatalError as err:
         raise Esp_flasherError(f"Error setting flash parameters: {err}") from err
 
-    if not args.no_erase:
+    if not no_erase:
         try:
             esptool.erase_flash(stub_chip, mock_args)
         except esptool.FatalError as err:
@@ -167,15 +172,18 @@ def run_esp_flasher(argv):
     print("Done! Flashing is complete!")
     print()
 
-    if args.upload_baud_rate != 115200:
+    if baud_rate != 115200:
         # pylint: disable=protected-access
         stub_chip._port.baudrate = 115200
         time.sleep(0.05)  # get rid of crap sent during baud rate change
         # pylint: disable=protected-access
         stub_chip._port.flushInput()
 
+    # Close the serial connection
+    chip._port.close()
+
     # pylint: disable=protected-access
-    show_logs(stub_chip._port)
+    show_logs(port)
 
 
 def main():
@@ -184,7 +192,7 @@ def main():
             from esp_flasher import gui
 
             return gui.main() or 0
-        return run_esp_flasher(sys.argv) or 0
+        return run(sys.argv) or 0
     except Esp_flasherError as err:
         msg = str(err)
         if msg:

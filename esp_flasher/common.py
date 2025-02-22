@@ -118,10 +118,7 @@ def read_chip_info(chip):
             has_embedded_flash,
             has_factory_calibrated_adc,
         )
-    if isinstance(chip, esptool.ESP8266ROM):
-        model = read_chip_property(chip.get_chip_description)
-        chip_id = read_chip_property(chip.chip_id)
-        return ESP8266ChipInfo(model, mac, chip_id)
+
     raise Esp_flasherError(f"Unknown chip type {type(chip)}")
 
 
@@ -236,19 +233,15 @@ def configure_write_flash_args(firmware_path):
     return MockEsptoolArgs(flash_size, addr_filename, flash_mode, flash_freq)
 
 
-def detect_chip(port, force_esp8266=False, force_esp32=False):
-    if force_esp8266 or force_esp32:
-        klass = esptool.ESP32ROM if force_esp32 else esptool.ESP8266ROM
-        chip = klass(port)
-    else:
-        try:
-            chip = esptool.ESPLoader.detect_chip(port)
-        except esptool.FatalError as err:
-            if "Wrong boot mode detected" in str(err):
-                msg = "ESP is not in flash boot mode. If your board has a flashing pin, try again while keeping it pressed."
-            else:
-                msg = f"ESP Chip Auto-Detection failed: {err}"
-            raise Esp_flasherError(msg) from err
+def detect_chip(port):
+    try:
+        chip = esptool.ESPLoader.detect_chip(port)
+    except esptool.FatalError as err:
+        if "Wrong boot mode detected" in str(err):
+            msg = "ESP is not in flash boot mode. If your board has a flashing pin, try again while keeping it pressed."
+        else:
+            msg = f"ESP Chip Auto-Detection failed: {err}"
+        raise Esp_flasherError(msg) from err
 
     try:
         chip.connect()

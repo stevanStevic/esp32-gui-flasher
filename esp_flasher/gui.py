@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QGridLayout,
 )
-from PyQt5.QtGui import QColor, QTextCursor, QPalette, QColor
+from PyQt5.QtGui import QColor, QTextCursor, QPalette, QColor, QIcon
 from PyQt5.QtCore import pyqtSignal, QObject
 
 from esp_flasher.helpers import list_serial_ports
@@ -71,21 +71,76 @@ class RedirectText(QObject):
 
 
 class FlashingThread(threading.Thread):
-    def __init__(self, firmware, port, show_logs=False):
+    def __init__(self, firmware, port):
         threading.Thread.__init__(self)
         self.daemon = True
         self._firmware = firmware
         self._port = port
-        self._show_logs = show_logs
 
     def run(self):
         try:
             from esp_flasher.__main__ import run_esp_flasher
 
-            argv = ["esp_flasher", "--port", self._port, "--firmware", self._firmware]
-            if self._show_logs:
-                argv.append("--show-logs")
-            run_esp_flasher(argv)
+            run_esp_flasher(self._port, self._firmware)
+        except Exception as e:
+            print("Unexpected error: {}".format(e))
+            raise
+
+
+class ChipInfoThread(threading.Thread):
+    def __init__(self, port):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self._port = port
+
+    def run(self):
+        try:
+            from esp_flasher.__main__ import dump_info
+
+            dump_info(self._port)
+        except Exception as e:
+            print("Unexpected error: {}".format(e))
+            raise
+
+
+class LogThread(threading.Thread):
+    def __init__(self, port, stop=False):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self._port = port
+        self._stop = stop
+
+    def run(self):
+        try:
+            from esp_flasher.__main__ import show_logs, stop_logs
+
+            if self._stop == True:
+                stop_logs()
+            else:
+                show_logs(self._port)
+        except Exception as e:
+            print("Unexpected error: {}".format(e))
+            raise
+
+
+class PrintingThread(threading.Thread):
+    def __init__(self, chip_port, printer_port):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self._chip_port = chip_port
+        self._printer_port = printer_port
+
+    def run(self):
+        try:
+            from esp_flasher.printer import print_message
+            from esp_flasher.common import detect_chip, read_chip_info
+
+            chip = detect_chip(self._chip_port)
+            info = read_chip_info(chip)
+            chip._port.close()
+
+            # Print on thermal printer
+            print_message(self._printer_port, f"Device Name: GB_{info.mac}")
         except Exception as e:
             print("Unexpected error: {}".format(e))
             raise
@@ -96,32 +151,51 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self._firmware = None
-        self._port = None
+        self._chip_port = None
+        self._printer_port = None
 
         self.init_ui()
         sys.stdout = RedirectText(self.console)  # Redirect stdout to console
 
     def init_ui(self):
-        self.setWindowTitle(f"ESP32-GUI-Flasher {__version__}")
+        self.setWindowTitle(f"ESP32-GUI-Flasher with Printer Support {__version__}")
         self.setGeometry(100, 100, 800, 600)
+        self.setWindowIcon(QIcon("icon.ico"))
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
         vbox = QVBoxLayout()
 
-        port_group_box = QGroupBox("Serial Port")
+        port_group_box = QGroupBox("Port Configuration")
         port_layout = QGridLayout()
-        port_label = QLabel("Select Port:")
+        port_label = QLabel("Select Chip Port:")
         self.port_combobox = QComboBox()
-        self.reload_ports()
         self.port_combobox.currentIndexChanged.connect(self.select_port)
+        printer_port_label = QLabel("Select Printer Port:")
+        self.printer_port_combobox = QComboBox()
+        self.printer_port_combobox.currentIndexChanged.connect(self.select_printer_port)
+        self.reload_ports()
+
         reload_button = QPushButton("Reload")
         reload_button.clicked.connect(self.reload_ports)
+
         port_layout.addWidget(port_label, 0, 0)
         port_layout.addWidget(self.port_combobox, 0, 1)
         port_layout.addWidget(reload_button, 0, 2)
+        port_layout.addWidget(printer_port_label, 1, 0)
+        port_layout.addWidget(self.printer_port_combobox, 1, 1)
         port_group_box.setLayout(port_layout)
+
+        chip_info_group_box = QGroupBox("Chip Info")
+        chip_info_layout = QHBoxLayout()
+        self.get_device_info_button = QPushButton("Get Device Info")
+        self.get_device_info_button.clicked.connect(self.get_device_info)
+        self.print_button = QPushButton("Print")
+        self.print_button.clicked.connect(self.print)
+        chip_info_layout.addWidget(self.get_device_info_button)
+        chip_info_layout.addWidget(self.print_button)
+        chip_info_group_box.setLayout(chip_info_layout)
 
         firmware_group_box = QGroupBox("Firmware")
         firmware_layout = QGridLayout()
@@ -138,8 +212,11 @@ class MainWindow(QMainWindow):
         self.flash_button.clicked.connect(self.flash_esp)
         self.logs_button = QPushButton("View Logs")
         self.logs_button.clicked.connect(self.view_logs)
+        self.clear_button = QPushButton("Clear")
+        self.clear_button.clicked.connect(self.stop_logs)
         actions_layout.addWidget(self.flash_button)
         actions_layout.addWidget(self.logs_button)
+        actions_layout.addWidget(self.clear_button)
         actions_group_box.setLayout(actions_layout)
 
         console_group_box = QGroupBox("Console")
@@ -151,6 +228,7 @@ class MainWindow(QMainWindow):
 
         vbox.addWidget(port_group_box)
         vbox.addWidget(firmware_group_box)
+        vbox.addWidget(chip_info_group_box)
         vbox.addWidget(actions_group_box)
         vbox.addWidget(console_group_box)
 
@@ -158,15 +236,20 @@ class MainWindow(QMainWindow):
 
     def reload_ports(self):
         self.port_combobox.clear()
+        self.printer_port_combobox.clear()
+
         ports = list_serial_ports()
         if ports:
             self.port_combobox.addItems(ports)
-            self._port = ports[0]
+            self.printer_port_combobox.addItems(ports)
         else:
             self.port_combobox.addItem("")
 
     def select_port(self, index):
-        self._port = self.port_combobox.itemText(index)
+        self._chip_port = self.port_combobox.itemText(index)
+
+    def select_printer_port(self, index):
+        self._printer_port = self.printer_port_combobox.itemText(index)
 
     def pick_file(self):
         options = QFileDialog.Options()
@@ -183,14 +266,33 @@ class MainWindow(QMainWindow):
 
     def flash_esp(self):
         self.console.clear()
-        if self._firmware and self._port:
-            worker = FlashingThread(self._firmware, self._port)
+        if self._firmware and self._chip_port:
+            worker = FlashingThread(self._firmware, self._chip_port)
             worker.start()
 
     def view_logs(self):
         self.console.clear()
-        if self._port:
-            worker = FlashingThread("dummy", self._port, show_logs=True)
+        if self._chip_port:
+            worker = LogThread(self._chip_port)
+            worker.start()
+
+    def stop_logs(self):
+        self.console.clear()
+        if self._chip_port:
+            worker = LogThread(self._chip_port, stop=True)
+            worker.start()
+        self.console.clear()
+
+    def get_device_info(self):
+        self.console.clear()
+        if self._chip_port:
+            worker = ChipInfoThread(self._chip_port)
+            worker.start()
+
+    def print(self):
+        self.console.clear()
+        if self._chip_port:
+            worker = PrintingThread(self._chip_port, self._printer_port)
             worker.start()
 
 

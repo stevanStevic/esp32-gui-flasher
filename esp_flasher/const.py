@@ -6,3 +6,5 @@ __version__ = "1.0.0"
 HTTP_REGEX = re.compile(
     r"https?://(www\.)?[-a-zA-Z0-9@:%._+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_+.~#?&/=]*)"
 )
+
+DEFAULT_BAUD_RATE = 460800
