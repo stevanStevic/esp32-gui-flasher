@@ -1,0 +1,5 @@
+pyserial>=3.5
+requests>=2.24.0,<3
+PyQT5>=5.15.10
+distro>=1.9.0
+esptool==3.2
