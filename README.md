@@ -3,15 +3,16 @@
 
 ESP32 GUI Flasher is an app for ESP8266 / ESP32 designed to make flashing your firmware easy with ability to print device info onto connected thermal printer.
 
- * Pre-built binaries for most used operating systems
- * Hiding all non-essential options for flashing
- * All necessary options (bootloader, flash mode, safeboot) are set automatically
+ * Pre-built binary for Windows.
+ * Hiding all non-essential options for flashing.
+ * All necessary options are set automatically.
+ * Provides optional connection to thermal printer.
 
 The flashing process is done using [esptool](https://github.com/espressif/esptool) from espressif.
 
 ## Installation
 
-- Check the releases section for your OS.
+- Check the releases section for released binary.
 - Download and double-click and it'll start.
 
 In the odd case of your antivirus going haywire over that application, it's a [false positive.](https://github.com/pyinstaller/pyinstaller/issues/3802)
