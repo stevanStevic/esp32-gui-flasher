@@ -5,7 +5,6 @@ import threading
 import os
 import platform
 import distro
-import esptool
 
 
 from PyQt5.QtWidgets import (
