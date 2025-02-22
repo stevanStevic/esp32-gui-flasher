@@ -18,11 +18,7 @@ from esp_flasher.common import (
     detect_flash_size,
     read_chip_info,
 )
-# from esp_flasher.const import (
-#     ESP32_DEFAULT_BOOTLOADER_FORMAT,
-#     ESP32_DEFAULT_OTA_DATA,
-#     ESP32_DEFAULT_PARTITIONS,
-# )
+
 from esp_flasher.helpers import list_serial_ports
 
 
@@ -38,26 +34,14 @@ def parse_args(argv):
         default=460800,
         help="Baud rate to upload with (not for logging)",
     )
-    # parser.add_argument(
-    #     "--bootloader",
-    #     help="(ESP32-only) The bootloader to flash.",
-    #     default=ESP32_DEFAULT_BOOTLOADER_FORMAT,
-    # )
-    # parser.add_argument(
-    #     "--partitions",
-    #     help="(ESP32-only) The partitions to flash.",
-    #     default=ESP32_DEFAULT_PARTITIONS,
-    # )
-    # parser.add_argument(
-    #     "--otadata",
-    #     help="(ESP32-only) The otadata file to flash.",
-    #     default=ESP32_DEFAULT_OTA_DATA,
-    # )
+    parser.add_argument(
+        "--firmware",
+        help="(ESP32-only) Firmware to flash",
+    )
     parser.add_argument(
         "--no-erase", help="Do not erase flash before flashing", action="store_true"
     )
     parser.add_argument("--show-logs", help="Only show logs", action="store_true")
-    parser.add_argument("binary", help="The binary image to flash.")
 
     return parser.parse_args(argv[1:])
 
@@ -107,11 +91,6 @@ def run_esp_flasher(argv):
         show_logs(serial_port)
         return
 
-    try:
-        # pylint: disable=consider-using-with
-        firmware = open(args.binary, "rb")
-    except IOError as err:
-        raise Esp_flasherError(f"Error opening binary: {err}") from err
     chip = detect_chip(port, args.esp8266, args.esp32)
     info = read_chip_info(chip)
 
@@ -161,9 +140,7 @@ def run_esp_flasher(argv):
 
     print(f" - Flash Size: {flash_size}")
 
-    mock_args = configure_write_flash_args(
-        info, firmware, flash_size, args.bootloader, args.partitions, args.otadata
-    )
+    mock_args = configure_write_flash_args(args.firmware)
 
     print(f" - Flash Mode: {mock_args.flash_mode}")
     print(f" - Flash Frequency: {mock_args.flash_freq.upper()}Hz")
@@ -219,4 +196,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-    

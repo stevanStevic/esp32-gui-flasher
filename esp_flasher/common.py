@@ -1,6 +1,9 @@
 import io
 import struct
-
+import os
+import json
+import zipfile
+import tempfile
 import esptool
 
 from esp_flasher.const import HTTP_REGEX
@@ -126,9 +129,7 @@ def chip_run_stub(chip):
     try:
         return chip.run_stub()
     except esptool.FatalError as err:
-        raise Esp_flasherError(
-            f"Error putting ESP in stub flash mode: {err}"
-        ) from err
+        raise Esp_flasherError(f"Error putting ESP in stub flash mode: {err}") from err
 
 
 def detect_flash_size(stub_chip):
@@ -186,29 +187,52 @@ def format_bootloader_path(path, flash_mode, flash_freq):
     return path.replace("$FLASH_MODE$", flash_mode).replace("$FLASH_FREQ$", flash_freq)
 
 
-def configure_write_flash_args(
-    info, firmware_path, flash_size, bootloader_path, partitions_path, otadata_path
-):
-    addr_filename = []
-    firmware = open_downloadable_binary(firmware_path)
-    flash_mode, flash_freq = read_firmware_info(firmware)
-    if isinstance(info, ESP32ChipInfo):
-        if flash_freq in ("26m", "20m"):
-            raise Esp_flasherError(
-                f"No bootloader available for flash frequency {flash_freq}"
-            )
-        bootloader = open_downloadable_binary(
-            format_bootloader_path(bootloader_path, flash_mode, flash_freq)
-        )
-        partitions = open_downloadable_binary(partitions_path)
-        otadata = open_downloadable_binary(otadata_path)
+def configure_write_flash_args(firmware_path):
+    """
+    Extracts firmware ZIP, reads `flasher_args.json`, and constructs flashing arguments.
 
-        addr_filename.append((0x1000, bootloader))
-        addr_filename.append((0x8000, partitions))
-        addr_filename.append((0xE000, otadata))
-        addr_filename.append((0x10000, firmware))
-    else:
-        addr_filename.append((0x0, firmware))
+    Args:
+        firmware_path (str): Path to the firmware ZIP file.
+
+    Returns:
+        dict: Contains flash mode, flash frequency, and list of (offset, file) tuples.
+    """
+
+    if not os.path.exists(firmware_path):
+        raise FileNotFoundError(f"Firmware file not found: {firmware_path}")
+
+    # Extract ZIP to a temporary directory
+    temp_dir = tempfile.mkdtemp()
+    with zipfile.ZipFile(firmware_path, "r") as zip_ref:
+        zip_ref.extractall(temp_dir)
+
+    # Locate `flasher_args.json`
+    flasher_args_path = os.path.join(temp_dir, "flasher_args.json")
+    if not os.path.exists(flasher_args_path):
+        raise FileNotFoundError("flasher_args.json not found in firmware package!")
+
+    # Load flasher_args.json
+    with open(flasher_args_path, "r") as f:
+        flasher_args = json.load(f)
+
+    # Extract flash mode, frequency, and files
+    flash_mode = flasher_args["flash_settings"]["flash_mode"]
+    flash_freq = flasher_args["flash_settings"]["flash_freq"]
+    flash_size = flasher_args["flash_settings"]["flash_size"]
+    flash_files = flasher_args["flash_files"]
+
+    # Prepare list of (offset, filename) tuples
+    addr_filename = []
+    for offset, relative_path in flash_files.items():
+        abs_path = os.path.join(temp_dir, relative_path)
+        try:
+            binary = open_downloadable_binary(abs_path)
+            offset_int = int(offset, 16)  # Convert offset from string to hex integer
+            addr_filename.append((offset_int, binary))
+        except ValueError:
+            raise ValueError(f"Invalid offset format: {offset}")
+
+    # Return structured arguments
     return MockEsptoolArgs(flash_size, addr_filename, flash_mode, flash_freq)
 
 

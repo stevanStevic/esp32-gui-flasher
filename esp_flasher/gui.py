@@ -8,28 +8,40 @@ import distro
 import esptool
 
 
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                             QHBoxLayout, QPushButton, QLabel, QComboBox,
-                             QFileDialog, QTextEdit, QGroupBox, QGridLayout)
+from PyQt5.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QComboBox,
+    QFileDialog,
+    QTextEdit,
+    QGroupBox,
+    QGridLayout,
+)
 from PyQt5.QtGui import QColor, QTextCursor, QPalette, QColor
 from PyQt5.QtCore import pyqtSignal, QObject
 
 from esp_flasher.helpers import list_serial_ports
 from esp_flasher.const import __version__
 
-COLOR_RE = re.compile(r'(?:\033)(?:\[(.*?)[@-~]|\].*?(?:\007|\033\\))')
+COLOR_RE = re.compile(r"(?:\033)(?:\[(.*?)[@-~]|\].*?(?:\007|\033\\))")
 COLORS = {
-    'black': QColor('black'),
-    'red': QColor('red'),
-    'green': QColor('green'),
-    'yellow': QColor('yellow'),
-    'blue': QColor('blue'),
-    'magenta': QColor('magenta'),
-    'cyan': QColor('cyan'),
-    'white': QColor('white'),
+    "black": QColor("black"),
+    "red": QColor("red"),
+    "green": QColor("green"),
+    "yellow": QColor("yellow"),
+    "blue": QColor("blue"),
+    "magenta": QColor("magenta"),
+    "cyan": QColor("cyan"),
+    "white": QColor("white"),
 }
-FORE_COLORS = {**COLORS, None: QColor('white')}
-BACK_COLORS = {**COLORS, None: QColor('black')}
+FORE_COLORS = {**COLORS, None: QColor("white")}
+BACK_COLORS = {**COLORS, None: QColor("black")}
+
 
 class RedirectText(QObject):
     text_written = pyqtSignal(str)
@@ -37,7 +49,7 @@ class RedirectText(QObject):
     def __init__(self, text_edit):
         super().__init__()
         self._out = text_edit
-        self._line = ''
+        self._line = ""
         self._bold = False
         self._italic = False
         self._underline = False
@@ -58,6 +70,7 @@ class RedirectText(QObject):
         self._out.insertPlainText(text)
         self._out.setTextCursor(cursor)
 
+
 class FlashingThread(threading.Thread):
     def __init__(self, firmware, port, show_logs=False):
         threading.Thread.__init__(self)
@@ -70,13 +83,14 @@ class FlashingThread(threading.Thread):
         try:
             from esp_flasher.__main__ import run_esp_flasher
 
-            argv = ['esp_flasher', '--port', self._port, self._firmware]
+            argv = ["esp_flasher", "--port", self._port, "--firmware", self._firmware]
             if self._show_logs:
-                argv.append('--show-logs')
+                argv.append("--show-logs")
             run_esp_flasher(argv)
         except Exception as e:
             print("Unexpected error: {}".format(e))
             raise
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -157,7 +171,13 @@ class MainWindow(QMainWindow):
 
     def pick_file(self):
         options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getOpenFileName(self, "Select Firmware File", "", "Binary Files (*.bin);;All Files (*)", options=options)
+        file_name, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Firmware File",
+            "",
+            "ZIP Files (*.zip);;All Files (*)",
+            options=options,
+        )
         if file_name:
             self._firmware = file_name
             self.firmware_button.setText(file_name)
@@ -171,24 +191,25 @@ class MainWindow(QMainWindow):
     def view_logs(self):
         self.console.clear()
         if self._port:
-            worker = FlashingThread('dummy', self._port, show_logs=True)
+            worker = FlashingThread("dummy", self._port, show_logs=True)
             worker.start()
+
 
 def main():
 
     os_name = platform.system()
-    if os_name == 'Darwin':
-        os.environ['QT_QPA_PLATFORM'] = 'cocoa'
-    elif os_name == 'Linux':
+    if os_name == "Darwin":
+        os.environ["QT_QPA_PLATFORM"] = "cocoa"
+    elif os_name == "Linux":
         distro_name = distro.id().lower()
-        if 'ubuntu' in distro_name or 'debian' in distro_name:
-            os.environ['QT_QPA_PLATFORM'] = 'wayland'
+        if "ubuntu" in distro_name or "debian" in distro_name:
+            os.environ["QT_QPA_PLATFORM"] = "wayland"
         else:
-            os.environ['QT_QPA_PLATFORM'] = 'xcb'
-    elif os_name == 'Windows':
-        os.environ['QT_QPA_PLATFORM'] = 'windows'
+            os.environ["QT_QPA_PLATFORM"] = "xcb"
+    elif os_name == "Windows":
+        os.environ["QT_QPA_PLATFORM"] = "windows"
     else:
-        os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
     app = QApplication(sys.argv)
 
@@ -212,6 +233,7 @@ def main():
     main_window = MainWindow()
     main_window.show()
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()
