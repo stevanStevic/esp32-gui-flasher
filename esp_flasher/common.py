@@ -234,6 +234,7 @@ def configure_write_flash_args(firmware_path):
 
 
 def detect_chip(port):
+    chip = None
     try:
         chip = esptool.ESPLoader.detect_chip(port)
     except esptool.FatalError as err:

@@ -3,6 +3,8 @@ from brother_ql.raster import BrotherQLRaster
 from brother_ql.conversion import convert
 from brother_ql.backends.helpers import send
 
+from esp_flasher.common import Esp_flasherError
+
 
 def print_message(
     port: str, message: str, printer_model: str = "QL-600B", label: str = "62"
@@ -20,7 +22,6 @@ def print_message(
         None: Prints the message and outputs success or error messages.
     """
     try:
-        print(message)
         ql = BrotherQLRaster(printer_model)
         instructions = convert(
             ql,
@@ -33,6 +34,5 @@ def print_message(
             dpi_600=False,  # Use 300dpi mode
         )
         send(instructions, port)
-        print("Message printed successfully!")
-    except Exception as e:
-        print(f"Error: {e}")
+    except Exception as err:
+        raise Esp_flasherError(f"Error while printing {message}: {err}") from err

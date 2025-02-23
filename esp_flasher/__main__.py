@@ -14,7 +14,6 @@ from esp_flasher.common import (
     chip_run_stub,
     configure_write_flash_args,
     detect_chip,
-    detect_flash_size,
     read_chip_info,
 )
 
@@ -96,23 +95,26 @@ def show_logs(port):
 
 
 def dump_info(port):
-    chip = detect_chip(port)
-    info = read_chip_info(chip)
+    try:
+        chip = detect_chip(port)
+        info = read_chip_info(chip)
 
-    print()
-    print("Chip Info:")
-    print(f" - Chip Family: {info.family}")
-    print(f" - Chip Model: {info.model}")
-    print(f" - Number of Cores: {info.num_cores}")
-    print(f" - Max CPU Frequency: {info.cpu_frequency}")
-    print(f" - Has Bluetooth: {'YES' if info.has_bluetooth else 'NO'}")
-    print(f" - Has Embedded Flash: {'YES' if info.has_embedded_flash else 'NO'}")
-    print(
-        f" - Has Factory-Calibrated ADC: {'YES' if info.has_factory_calibrated_adc else 'NO'}"
-    )
-    print(f" - MAC Address: {info.mac}")
+        print()
+        print("Chip Info:")
+        print(f" - Chip Family: {info.family}")
+        print(f" - Chip Model: {info.model}")
+        print(f" - Number of Cores: {info.num_cores}")
+        print(f" - Max CPU Frequency: {info.cpu_frequency}")
+        print(f" - Has Bluetooth: {'YES' if info.has_bluetooth else 'NO'}")
+        print(f" - Has Embedded Flash: {'YES' if info.has_embedded_flash else 'NO'}")
+        print(
+            f" - Has Factory-Calibrated ADC: {'YES' if info.has_factory_calibrated_adc else 'NO'}"
+        )
+        print(f" - MAC Address: {info.mac}")
 
-    chip._port.close()
+        chip._port.close()
+    except Exception as e:
+        pass
 
 
 def run(argv):

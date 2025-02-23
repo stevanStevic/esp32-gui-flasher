@@ -20,9 +20,10 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QGroupBox,
     QGridLayout,
+    QLineEdit,
 )
 from PyQt5.QtGui import QColor, QTextCursor, QPalette, QColor, QIcon
-from PyQt5.QtCore import pyqtSignal, QObject
+from PyQt5.QtCore import pyqtSignal, QObject, QThread
 
 from esp_flasher.helpers import list_serial_ports
 from esp_flasher.const import __version__
@@ -87,20 +88,29 @@ class FlashingThread(threading.Thread):
             raise
 
 
-class ChipInfoThread(threading.Thread):
+class ChipInfoThread(QThread):
+    mac_address_signal = pyqtSignal(str)  # Signal to send MAC address to MainWindow
+    error_signal = pyqtSignal(str)  # Signal for error handling
+
     def __init__(self, port):
-        threading.Thread.__init__(self)
+        super().__init__()
         self.daemon = True
         self._port = port
 
     def run(self):
         try:
-            from esp_flasher.__main__ import dump_info
+            from esp_flasher.__main__ import dump_info, detect_chip, read_chip_info
 
             dump_info(self._port)
+            chip = detect_chip(self._port)
+            info = read_chip_info(chip)
+            chip._port.close()
+            self.mac_address = info.mac  # Store MAC address
+            self.mac_address_signal.emit(self.mac_address)  # Emit MAC address
         except Exception as e:
-            print("Unexpected error: {}".format(e))
-            raise
+            self.error_signal.emit(
+                f"Error: {str(e)}"
+            )  # Emit error message instead of crashing
 
 
 class LogThread(threading.Thread):
@@ -123,27 +133,62 @@ class LogThread(threading.Thread):
             raise
 
 
-class PrintingThread(threading.Thread):
-    def __init__(self, chip_port, printer_port):
-        threading.Thread.__init__(self)
-        self.daemon = True
-        self._chip_port = chip_port
+class PrintingThread(QThread):
+    success_signal = pyqtSignal(str)  # Signal for success messages
+    error_signal = pyqtSignal(str)  # Signal for error messages
+
+    def __init__(self, printer_port, device_name):
+        super().__init__()
+        self._device_name = device_name
         self._printer_port = printer_port
 
     def run(self):
+        """Runs the print job safely and emits signals based on the outcome."""
         try:
             from esp_flasher.printer import print_message
-            from esp_flasher.common import detect_chip, read_chip_info
 
-            chip = detect_chip(self._chip_port)
-            info = read_chip_info(chip)
-            chip._port.close()
+            if not self._device_name:
+                self.error_signal.emit(
+                    "Error: Device name is missing. Please register the device first."
+                )
+                return
 
-            # Print on thermal printer
-            print_message(self._printer_port, f"Device Name: GB_{info.mac}")
+            print_message(self._printer_port, self._device_name)
+            self.success_signal.emit(f"Printed successfully: {self._device_name}")
+
         except Exception as e:
-            print("Unexpected error: {}".format(e))
-            raise
+            self.error_signal.emit(f"Printing Error: {str(e)}")
+
+
+class RegisterThread(QThread):
+    device_name_signal = pyqtSignal(str)  # Signal for successful registration
+    error_signal = pyqtSignal(str)  # Signal for error handling
+
+    def __init__(self, api_endpoint, api_key, api_secret, mac_address):
+        super().__init__()
+        self._api_endpoint = api_endpoint
+        self._api_key = api_key
+        self._api_secret = api_secret
+        self._mac = mac_address
+
+    def run(self):
+        """Publishes MAC address and handles API response."""
+        try:
+            from esp_flasher.backend import publish_mac_address
+
+            device_name, error_message = publish_mac_address(
+                self._api_endpoint, self._api_key, self._api_secret, self._mac
+            )
+
+            if device_name:
+                self.device_name_signal.emit(
+                    device_name
+                )  # Emit device name if successful
+            else:
+                self.error_signal.emit(error_message)  # Emit error if request failed
+
+        except Exception as e:
+            self.error_signal.emit(f"Unexpected error: {e}")  # Handle unexpected errors
 
 
 class MainWindow(QMainWindow):
@@ -153,6 +198,12 @@ class MainWindow(QMainWindow):
         self._firmware = None
         self._chip_port = None
         self._printer_port = None
+        # Variables to store backend connection values
+        self._api_endpoint = ""
+        self._api_key = ""
+        self._api_secret = ""
+        self._mac_address = None  # Store MAC address
+        self._device_name = ""
 
         self.init_ui()
         sys.stdout = RedirectText(self.console)  # Redirect stdout to console
@@ -187,13 +238,44 @@ class MainWindow(QMainWindow):
         port_layout.addWidget(self.printer_port_combobox, 1, 1)
         port_group_box.setLayout(port_layout)
 
+        # Create Group Box
+        backend_connection_group_box = QGroupBox("Backend Connection")
+        backend_connection_layout = QVBoxLayout()
+
+        # Create Labels and LineEdits
+        self.fields = {
+            "API Endpoint": "_api_endpoint",
+            "API Key": "_api_key",
+            "API Secret": "_api_secret",
+        }
+        self.line_edits = {}
+
+        for label_text, var_name in self.fields.items():
+            row_layout = QHBoxLayout()
+            label = QLabel(label_text)
+            line_edit = QLineEdit()
+            line_edit.textChanged.connect(
+                lambda text, v=var_name: self.on_text_changed(text, v)
+            )
+            self.line_edits[var_name] = line_edit
+
+            row_layout.addWidget(label)
+            row_layout.addWidget(line_edit)
+
+            backend_connection_layout.addLayout(row_layout)
+
+        backend_connection_group_box.setLayout(backend_connection_layout)
+
         chip_info_group_box = QGroupBox("Chip Info")
         chip_info_layout = QHBoxLayout()
         self.get_device_info_button = QPushButton("Get Device Info")
         self.get_device_info_button.clicked.connect(self.get_device_info)
+        self.register_button = QPushButton("Register")
+        self.register_button.clicked.connect(self.register)
         self.print_button = QPushButton("Print")
         self.print_button.clicked.connect(self.print)
         chip_info_layout.addWidget(self.get_device_info_button)
+        chip_info_layout.addWidget(self.register_button)
         chip_info_layout.addWidget(self.print_button)
         chip_info_group_box.setLayout(chip_info_layout)
 
@@ -227,8 +309,9 @@ class MainWindow(QMainWindow):
         console_group_box.setLayout(console_layout)
 
         vbox.addWidget(port_group_box)
-        vbox.addWidget(firmware_group_box)
+        vbox.addWidget(backend_connection_group_box)
         vbox.addWidget(chip_info_group_box)
+        vbox.addWidget(firmware_group_box)
         vbox.addWidget(actions_group_box)
         vbox.addWidget(console_group_box)
 
@@ -286,14 +369,64 @@ class MainWindow(QMainWindow):
     def get_device_info(self):
         self.console.clear()
         if self._chip_port:
-            worker = ChipInfoThread(self._chip_port)
-            worker.start()
+            self.chip_info_thread = ChipInfoThread(self._chip_port)
+            self.chip_info_thread.mac_address_signal.connect(self.update_mac_address)
+            self.chip_info_thread.error_signal.connect(
+                self.show_message
+            )  # Handle errors
+            self.chip_info_thread.start()
+
+    def update_mac_address(self, mac):
+        self._mac_address = mac  # Store MAC address
+
+    def show_message(self, error_message):
+        """Displays errors instead of crashing."""
+        print(error_message)  # Show error on UI
+
+    def register(self):
+        self.console.clear()
+        if (
+            self._api_endpoint
+            and self._api_key
+            and self._api_secret
+            and self._mac_address
+        ):
+            """Starts device registration."""
+            self.register_thread = RegisterThread(
+                self._api_endpoint, self._api_key, self._api_secret, self._mac_address
+            )
+            self.register_thread.device_name_signal.connect(self.update_device_name)
+            self.register_thread.error_signal.connect(self.show_message)
+            self.register_thread.start()
+        else:
+            if not self._mac_address:
+                print("No MAC address, first click Get Device Info!")
+            else:
+                print(
+                    f"One or more of the following fields are empty: API Endpoint, API Key or API Secret."
+                )
+
+    def update_device_name(self, device_name):
+        """Updates UI when registration is successful."""
+        self._device_name = device_name
+        print(f"Device Name: {device_name}")
 
     def print(self):
         self.console.clear()
         if self._chip_port:
-            worker = PrintingThread(self._chip_port, self._printer_port)
-            worker.start()
+            """Starts the printing process using `PrintingThread`."""
+            if not self._device_name:
+                print("Error: Device name not obtained, first Register the device.")
+                return
+
+            self.print_thread = PrintingThread(self._printer_port, self._device_name)
+            self.print_thread.success_signal.connect(self.show_message)
+            self.print_thread.error_signal.connect(self.show_message)
+            self.print_thread.start()
+
+    def on_text_changed(self, text, field_name):
+        setattr(self, field_name, text)
+        print(f"{field_name} updated: {text}")
 
 
 def main():
