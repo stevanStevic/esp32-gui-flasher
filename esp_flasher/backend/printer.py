@@ -1,9 +1,8 @@
-import argparse
 from brother_ql.raster import BrotherQLRaster
 from brother_ql.conversion import convert
 from brother_ql.backends.helpers import send
 
-from esp_flasher.common import Esp_flasherError
+from esp_flasher.helpers.helpers import Esp_flasherError
 
 
 def print_message(

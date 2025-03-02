@@ -1,17 +1,7 @@
-import io
 import struct
-import os
-import json
-import zipfile
-import tempfile
 import esptool
 
-from esp_flasher.const import HTTP_REGEX
-from esp_flasher.helpers import prevent_print
-
-
-class Esp_flasherError(Exception):
-    pass
+from esp_flasher.helpers.helpers import prevent_print, Esp_flasherError
 
 
 class MockEsptoolArgs:
@@ -149,104 +139,15 @@ def read_firmware_info(firmware):
     return flash_mode, flash_freq
 
 
-def open_downloadable_binary(path):
-    if hasattr(path, "seek"):
-        path.seek(0)
-        return path
-
-    if HTTP_REGEX.match(path) is not None:
-        import requests
-
-        try:
-            response = requests.get(path)
-            response.raise_for_status()
-        except requests.exceptions.Timeout as err:
-            raise Esp_flasherError(
-                f"Timeout while retrieving firmware file '{path}': {err}"
-            ) from err
-        except requests.exceptions.RequestException as err:
-            raise Esp_flasherError(
-                f"Error while retrieving firmware file '{path}': {err}"
-            ) from err
-
-        binary = io.BytesIO()
-        binary.write(response.content)
-        binary.seek(0)
-        return binary
-
-    try:
-        return open(path, "rb")
-    except IOError as err:
-        raise Esp_flasherError(f"Error opening binary '{path}': {err}") from err
-
-
 def format_bootloader_path(path, flash_mode, flash_freq):
     return path.replace("$FLASH_MODE$", flash_mode).replace("$FLASH_FREQ$", flash_freq)
 
 
-def configure_write_flash_args(firmware_path):
-    """
-    Extracts firmware ZIP, reads `flasher_args.json`, and constructs flashing arguments.
-
-    Args:
-        firmware_path (str): Path to the firmware ZIP file.
-
-    Returns:
-        dict: Contains flash mode, flash frequency, and list of (offset, file) tuples.
-    """
-
-    if not os.path.exists(firmware_path):
-        raise FileNotFoundError(f"Firmware file not found: {firmware_path}")
-
-    # Extract ZIP to a temporary directory
-    temp_dir = tempfile.mkdtemp()
-    with zipfile.ZipFile(firmware_path, "r") as zip_ref:
-        zip_ref.extractall(temp_dir)
-
-    # Locate `flasher_args.json`
-    flasher_args_path = os.path.join(temp_dir, "flasher_args.json")
-    if not os.path.exists(flasher_args_path):
-        raise FileNotFoundError("flasher_args.json not found in firmware package!")
-
-    # Load flasher_args.json
-    with open(flasher_args_path, "r") as f:
-        flasher_args = json.load(f)
-
-    # Extract flash mode, frequency, and files
-    flash_mode = flasher_args["flash_settings"]["flash_mode"]
-    flash_freq = flasher_args["flash_settings"]["flash_freq"]
-    flash_size = flasher_args["flash_settings"]["flash_size"]
-    flash_files = flasher_args["flash_files"]
-
-    # Prepare list of (offset, filename) tuples
-    addr_filename = []
-    for offset, relative_path in flash_files.items():
-        abs_path = os.path.join(temp_dir, relative_path)
-        try:
-            binary = open_downloadable_binary(abs_path)
-            offset_int = int(offset, 16)  # Convert offset from string to hex integer
-            addr_filename.append((offset_int, binary))
-        except ValueError:
-            raise ValueError(f"Invalid offset format: {offset}")
-
-    # Return structured arguments
-    return MockEsptoolArgs(flash_size, addr_filename, flash_mode, flash_freq)
-
-
 def detect_chip(port):
-    chip = None
+    """Detect ESP chip type."""
     try:
         chip = esptool.ESPLoader.detect_chip(port)
-    except esptool.FatalError as err:
-        if "Wrong boot mode detected" in str(err):
-            msg = "ESP is not in flash boot mode. If your board has a flashing pin, try again while keeping it pressed."
-        else:
-            msg = f"ESP Chip Auto-Detection failed: {err}"
-        raise Esp_flasherError(msg) from err
-
-    try:
         chip.connect()
+        return chip
     except esptool.FatalError as err:
-        raise Esp_flasherError(f"Error connecting to ESP: {err}") from err
-
-    return chip
+        raise Esp_flasherError(f"ESP Chip Auto-Detection failed: {err}") from err
