@@ -1,7 +1,7 @@
 import struct
 import esptool
 
-from esp_flasher.helpers.helpers import prevent_print, Esp_flasherError
+from esp_flasher.helpers.utils import prevent_print, Esp_flasherError
 
 
 class MockEsptoolArgs:

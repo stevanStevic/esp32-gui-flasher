@@ -1,6 +1,6 @@
 import time
 import esptool
-from esp_flasher.helpers.helpers import Esp_flasherError
+from esp_flasher.helpers.utils import Esp_flasherError
 from esp_flasher.core.chip_utils import (
     chip_run_stub,
     detect_chip,

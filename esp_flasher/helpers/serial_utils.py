@@ -1,4 +1,4 @@
-from esp_flasher.helpers.helpers import Esp_flasherError
+from esp_flasher.helpers.utils import Esp_flasherError
 import esptool
 
 

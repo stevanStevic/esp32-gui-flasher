@@ -4,7 +4,7 @@ import tempfile
 import os
 
 from esp_flasher.core.chip_utils import MockEsptoolArgs
-from esp_flasher.helpers.helpers import open_downloadable_binary
+from esp_flasher.helpers.utils import open_downloadable_binary
 
 
 def configure_write_flash_args(firmware_path):
