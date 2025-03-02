@@ -1,50 +1,48 @@
-from PyQt5.QtWidgets import QGroupBox, QGridLayout, QLabel, QComboBox, QPushButton
+from PyQt5.QtWidgets import (
+    QGroupBox,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QComboBox,
+)
 from esp_flasher.helpers.serial_utils import list_serial_ports
 
 
 class PortConfig(QGroupBox):
     def __init__(self, parent):
-        super().__init__("Port Configuration")
+        super().__init__("Chip Port Configuration")
         self.parent = parent
         self.init_ui()
 
     def init_ui(self):
-        layout = QGridLayout()
+        layout = QVBoxLayout()
 
-        port_label = QLabel("Select Chip Port:")
-        self.port_combobox = QComboBox()
-        self.port_combobox.currentIndexChanged.connect(self.select_port)
+        # Chip Port selection
+        chip_port_layout = QHBoxLayout()
+        chip_port_label = QLabel("Select Chip Port:")
+        self.chip_port_combobox = QComboBox()
+        self.chip_port_combobox.currentIndexChanged.connect(self.select_port)
+        self.refresh_chip_ports()
 
-        printer_port_label = QLabel("Select Printer Port:")
-        self.printer_port_combobox = QComboBox()
-        self.printer_port_combobox.currentIndexChanged.connect(self.select_printer_port)
+        reload_button = QPushButton("Refresh")
+        reload_button.clicked.connect(self.refresh_chip_ports)
 
-        self.reload_ports()
+        chip_port_layout.addWidget(chip_port_label)
+        chip_port_layout.addWidget(self.chip_port_combobox)
+        chip_port_layout.addWidget(reload_button)
 
-        reload_button = QPushButton("Reload")
-        reload_button.clicked.connect(self.reload_ports)
-
-        layout.addWidget(port_label, 0, 0)
-        layout.addWidget(self.port_combobox, 0, 1)
-        layout.addWidget(reload_button, 0, 2)
-        layout.addWidget(printer_port_label, 1, 0)
-        layout.addWidget(self.printer_port_combobox, 1, 1)
-
+        layout.addLayout(chip_port_layout)
         self.setLayout(layout)
 
-    def reload_ports(self):
-        self.port_combobox.clear()
-        self.printer_port_combobox.clear()
-
+    def refresh_chip_ports(self):
+        """Refreshes available serial ports for the chip."""
+        self.chip_port_combobox.clear()
         ports = list_serial_ports()
         if ports:
-            self.port_combobox.addItems(ports)
-            self.printer_port_combobox.addItems(ports)
+            self.chip_port_combobox.addItems(ports)
         else:
-            self.port_combobox.addItem("No Ports Found")
+            self.chip_port_combobox.addItem("No serial ports found")
 
     def select_port(self, index):
-        self.parent._chip_port = self.port_combobox.itemText(index)
-
-    def select_printer_port(self, index):
-        self.parent._printer_port = self.printer_port_combobox.itemText(index)
+        self.parent._chip_port = self.chip_port_combobox.itemText(index)

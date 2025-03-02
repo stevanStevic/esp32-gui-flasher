@@ -36,11 +36,15 @@ class ChipInfoSection(QGroupBox):
             self.chip_info_thread.mac_address_signal.connect(self.update_mac_address)
             self.chip_info_thread.error_signal.connect(self.parent.show_message)
             self.chip_info_thread.start()
+        else:
+            self.parent.show_message("Error: Device port is missing!")
 
     def update_mac_address(self, mac):
         self.parent._mac_address = mac
 
     def register(self):
+        self.parent.console.clear()
+
         """Starts device registration."""
         if (
             not self.parent._api_endpoint
@@ -56,6 +60,7 @@ class ChipInfoSection(QGroupBox):
             )
             return
 
+        self.parent.console.clear()
         self.register_thread = RegisterThread(
             self.parent._api_endpoint,
             self.parent._api_key,
@@ -72,6 +77,8 @@ class ChipInfoSection(QGroupBox):
         self.parent.show_message(f"Device Registered: {device_name}")
 
     def print_device(self):
+        self.parent.console.clear()
+
         """Starts the printing process."""
         if not self.parent._printer_port:
             self.parent.show_message("Error: No printer port selected!")

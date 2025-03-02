@@ -1,28 +1,22 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 
+from esp_flasher.backend.printer import get_printer
+
 
 class PrintingThread(QThread):
-    success_signal = pyqtSignal(str)  # Signal for success messages
-    error_signal = pyqtSignal(str)  # Signal for error messages
+    success_signal = pyqtSignal(str)
+    error_signal = pyqtSignal(str)
 
-    def __init__(self, printer_port, device_name):
+    def __init__(self, printer_name, message):
         super().__init__()
-        self._printer_port = printer_port
-        self._device_name = device_name
+        self.printer_name = printer_name
+        self.message = message
 
     def run(self):
-        """Runs the print job safely and emits signals based on the outcome."""
+        """Runs the print job safely."""
         try:
-            from esp_flasher.backend.printer import print_message
-
-            if not self._device_name:
-                self.error_signal.emit(
-                    "Error: Device name is missing. Please register the device first."
-                )
-                return
-
-            print_message(self._printer_port, self._device_name)
-            self.success_signal.emit(f"Printed successfully: {self._device_name}")
-
+            printer = get_printer(self.printer_name)
+            result = printer.print_label(self.message)
+            self.success_signal.emit(result)
         except Exception as e:
             self.error_signal.emit(f"Printing Error: {str(e)}")

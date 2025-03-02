@@ -5,10 +5,10 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QGroupBox,
     QTextEdit,
-    QStyle,
 )
 from PyQt5.QtGui import QIcon, QColor, QPalette
 
+from esp_flasher.gui.printer_config import PrinterConfig
 from esp_flasher.gui.port_config import PortConfig
 from esp_flasher.gui.backend_config import BackendConfig
 from esp_flasher.gui.chip_info import ChipInfoSection
@@ -46,6 +46,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
 
         self.port_config = PortConfig(self)
+        self.printer_config = PrinterConfig(self)
         self.backend_config = BackendConfig(self)
         self.chip_info_section = ChipInfoSection(self)
         self.firmware_section = FirmwareSection(self)
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
         self.console_group_box.setLayout(console_layout)
 
         layout.addWidget(self.port_config)
+        layout.addWidget(self.printer_config)
         layout.addWidget(self.backend_config)
         layout.addWidget(self.chip_info_section)
         layout.addWidget(self.firmware_section)
