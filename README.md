@@ -33,14 +33,6 @@ If you want to build this application yourself you need to:
   type `esp_flasher -h` for info)
 - (Optional) Build the executable with these [instructions](./build-instructions.md).
 
-### Mac OSX (compiled binary only for 11 and newer)
-
-Driver maybe needed for Mac OSx.
-
-Info: https://www.silabs.com/community/interface/forum.topic.html/vcp_driver_for_macosbigsur110x-krlP
-
-Driver: https://www.silabs.com/documents/public/software/Mac_OSX_VCP_Driver.zip
-
 ## Acknowledgments
 
 This project is based on the work from:

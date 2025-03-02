@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 from esp_flasher.core import const
 
-PROJECT_NAME = "ESP32 GUI Flash Download Tool"
+PROJECT_NAME = "ESP32 GUI Flash Download Tool with Printer Support"
 PROJECT_PACKAGE_NAME = "esp32_gui_flasher"
 PROJECT_LICENSE = "MIT"
 PROJECT_AUTHOR = "Stevan Stevic"
@@ -44,6 +44,9 @@ setup(
     test_suite="tests",
     python_requires=">=3.8,<4.0",
     install_requires=REQUIRES,
+    extras_require={
+        "windows": ["pywin32"],  # Only install on Windows
+    },
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
     keywords=["esp32", "automation", "flash"],

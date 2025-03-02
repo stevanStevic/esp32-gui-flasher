@@ -1,6 +1,6 @@
-# macOS
+# Linux
 
-`pyinstaller -F -w -n ESP32-Flasher -i icon.icns esp_flasher/__main__.py`
+`python3 -m PyInstaller -F --add-data "icon.png:." -n ESP32-Flasher -i icon.png esp_flasher/__main__.py`
 
 # Windows
 
