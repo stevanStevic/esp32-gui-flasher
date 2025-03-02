@@ -51,7 +51,9 @@ class ChipInfoSection(QGroupBox):
             or not self.parent._api_key
             or not self.parent._api_secret
         ):
-            self.parent.show_message("Error: API credentials are missing!")
+            self.parent.show_message(
+                "Error: API endpoint and/or credentials are missing!"
+            )
             return
 
         if not self.parent._mac_address:
@@ -90,8 +92,20 @@ class ChipInfoSection(QGroupBox):
             )
             return
 
+        label_width = self.parent.printer_config.width_spinbox.value()
+        text_rotation = self.parent.printer_config.rotation_spinbox.value()
+        x_offset = self.parent.printer_config.x_offset_spinbox.value()
+        y_offset = self.parent.printer_config.y_offset_spinbox.value()
+        font_size = self.parent.printer_config.font_size_spinbox.value()
+
         self.print_thread = PrintingThread(
-            self.parent._printer_port, self.parent._device_name
+            self.parent._printer_port,
+            self.parent._device_name,
+            label_width,
+            x_offset,
+            y_offset,
+            text_rotation,
+            font_size,
         )
         self.print_thread.success_signal.connect(self.parent.show_message)
         self.print_thread.error_signal.connect(self.parent.show_message)

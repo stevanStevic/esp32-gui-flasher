@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon, QColor, QPalette
 
+from esp_flasher.backend.printer import get_printer
 from esp_flasher.gui.printer_config import PrinterConfig
 from esp_flasher.gui.port_config import PortConfig
 from esp_flasher.gui.backend_config import BackendConfig
