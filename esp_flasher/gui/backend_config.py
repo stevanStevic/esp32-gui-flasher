@@ -21,6 +21,11 @@ class BackendConfig(QGroupBox):
             row_layout = QHBoxLayout()
             label = QLabel(label_text)
             line_edit = QLineEdit()
+
+            # Mask API Key and API Secret fields
+            if var_name in ["_api_key", "_api_secret"]:
+                line_edit.setEchoMode(QLineEdit.Password)
+
             line_edit.textChanged.connect(
                 lambda text, v=var_name: self.on_text_changed(text, v)
             )

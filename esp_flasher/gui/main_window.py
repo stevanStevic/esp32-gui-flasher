@@ -8,7 +8,6 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon, QColor, QPalette
 
-from esp_flasher.backend.printer import get_printer
 from esp_flasher.gui.printer_config import PrinterConfig
 from esp_flasher.gui.port_config import PortConfig
 from esp_flasher.gui.backend_config import BackendConfig
@@ -17,6 +16,7 @@ from esp_flasher.gui.firmware_section import FirmwareSection
 from esp_flasher.gui.actions_section import ActionsSection
 from esp_flasher.helpers.redirect_text import RedirectText
 from esp_flasher.core.const import __version__
+from esp_flasher.core.config_loader import apply_config_to_gui
 
 
 class MainWindow(QMainWindow):
@@ -33,6 +33,7 @@ class MainWindow(QMainWindow):
         self._device_name = ""
 
         self.init_ui()
+        apply_config_to_gui(self)  # Load configuration into GUI
         self.apply_dark_theme()
         sys.stdout = RedirectText(self.console)  # Redirect stdout to console
 
