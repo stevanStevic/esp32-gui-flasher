@@ -38,7 +38,8 @@ def apply_config_to_gui(gui):
 
     # Apply chip port and firmware path
     gui.port_config.chip_port_combobox.setCurrentText(config.get("chip_port", ""))
-    gui.firmware_section.firmware_button.setText(config.get("firmware_path", ""))
+    gui._firmware = config.get("firmware_path", "")
+    gui.firmware_section.firmware_button.setText(gui._firmware)
 
     # Apply API settings
     api_settings = config.get("api_settings", {})
