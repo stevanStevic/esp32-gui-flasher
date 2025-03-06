@@ -103,6 +103,8 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+# Ignore signing keys
+keys*
 
 .DS_Store
 /.idea/
