@@ -143,10 +143,12 @@ def format_bootloader_path(path, flash_mode, flash_freq):
     return path.replace("$FLASH_MODE$", flash_mode).replace("$FLASH_FREQ$", flash_freq)
 
 
-def detect_chip(port):
+def detect_chip(port, baud=115200):
     """Detect ESP chip type."""
     try:
-        chip = esptool.ESPLoader.detect_chip(port)
+        chip = esptool.get_default_connected_device(
+            serial_list=[port], port=port, connect_attempts=1, initial_baud=baud
+        )
         chip.connect()
         return chip
     except esptool.FatalError as err:
