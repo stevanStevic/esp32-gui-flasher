@@ -1,7 +1,7 @@
 
-# ESP32 GUI Flasher with Connection to Thermal Printer
+# ESP32 GUI Flasher with Connection to Label Printer
 
-ESP32 GUI Flasher is an app for ESP8266 / ESP32 designed to make flashing your firmware easy with ability to print device info onto connected thermal printer.
+ESP32 GUI Flasher is an app for ESP32 designed to make flashing your firmware easy with ability to print device info with connected label printer.
 
  * Pre-built binary for Windows.
  * Using your firmware release as a zip file.
