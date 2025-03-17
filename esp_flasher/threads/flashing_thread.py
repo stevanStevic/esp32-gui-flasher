@@ -16,7 +16,7 @@ class FlashingThread(QThread):
         try:
             from esp_flasher.__main__ import run_esp_flasher
 
-            run_esp_flasher(self._port, self._firmware)
+            run_esp_flasher(self._port, self._firmware, baud_rate=460800)
 
             self.success_signal.emit("Flashing completed successfully!")
             self.finished_signal.emit(True)  # Notify ActionsSection of success

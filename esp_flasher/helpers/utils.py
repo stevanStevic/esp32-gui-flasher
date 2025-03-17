@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import io
+import json
 import os
 import sys
 
@@ -15,6 +16,7 @@ from esp_flasher.core.const import HTTP_REGEX
 
 # pylint: disable=unspecified-encoding,consider-using-with
 DEVNULL = open(os.devnull, "w")
+CONFIG_PATH = "config/.config"
 
 
 def open_downloadable_binary(path):
@@ -61,3 +63,18 @@ def prevent_print(func, *args, **kwargs):
         sys.stdout = orig_sys_stdout
         sys.stdout.isatty = lambda: False
         pass
+
+
+def load_config(path=CONFIG_PATH):
+    """Loads configuration from the .config JSON file."""
+    if not os.path.exists(path):
+        print("Config file not found, using defaults.")
+        return {}
+
+    try:
+        with open(path, "r") as config_file:
+            config = json.load(config_file)
+            return config
+    except json.JSONDecodeError as e:
+        print(f"Error parsing config file: {e}")
+        return {}

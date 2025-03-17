@@ -4,19 +4,29 @@ import esptool
 from esp_flasher.helpers.utils import prevent_print, Esp_flasherError
 
 
-class MockEsptoolArgs:
-    def __init__(self, flash_size, addr_filename, flash_mode, flash_freq):
-        self.compress = True
-        self.no_compress = False
+class EsptoolFlashArgs:
+    def __init__(
+        self,
+        chip,
+        write_flash_args,
+        flash_size,
+        addr_filename,
+        flash_mode,
+        flash_freq,
+        stub,
+        before,
+        after,
+    ):
+        self.chip = chip
+        self.write_flash_args = write_flash_args
         self.flash_size = flash_size
         self.addr_filename = addr_filename
         self.flash_mode = flash_mode
         self.flash_freq = flash_freq
-        self.no_stub = False
-        self.verify = False
-        self.erase_all = False
+        self.no_stub = not stub
+        self.before = before
+        self.after = after
         self.encrypt = False
-        self.encrypt_files = None
 
 
 class ChipInfo:
