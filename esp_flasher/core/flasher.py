@@ -15,8 +15,15 @@ def run_esp_flasher(port, firmware, baud_rate=115200, no_erase=True):
     flasher_args, extract_dir = extract_firmware(firmware_path=firmware)
     firmware_args = configure_write_flash_args(flasher_args, extract_dir)
 
-    enable_flash_encryption(port, baud_rate, flasher_args, extract_dir)
-    enable_secure_boot(port, baud_rate, flasher_args, extract_dir)
+    # Now check the configuration from the actual release
+    encryption_enabled = flasher_args.get("security", {}).get("encryption", False)
+    if encryption_enabled:
+        enable_flash_encryption(port, flasher_args, extract_dir)
+
+    # Now check the configuration from the actual release
+    secure_boot_enabled = flasher_args.get("security", {}).get("secure_boot", False)
+    if secure_boot_enabled:
+        enable_secure_boot(port, baud_rate, flasher_args, extract_dir)
 
     # Base esptool command
     esptool_cmd = [

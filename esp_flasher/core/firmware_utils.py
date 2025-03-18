@@ -62,10 +62,6 @@ def enable_secure_boot(port, baud_rate, flasher_args, extract_dir):
     if security is None:
         return  # Security in release not added.
 
-    secure_boot_enabled = security.get("secure_boot", False)
-    if secure_boot_enabled is False:
-        return  # Secure boot not enabled, skip
-
     # If release has security enabled then we need to specify block for digest flashing.
     # this can be extended to support multi-digest signing etc.
     if secure_boot_config.get("public_key_digest_block_index", None) is None:
@@ -122,15 +118,6 @@ def enable_flash_encryption(port, flasher_args, extract_dir):
 
     if flash_config is None:
         return  # Encryption config not good, skip
-
-    # Now check the configuration from the actual release
-    security = flasher_args.get("security", {}).get("")
-    if security is None:
-        return  # Security in release not enabled, skip
-
-    encryption_enabled = security.get("encryption", False)
-    if encryption_enabled is False:
-        return  # Secure boot not enabled, skip
 
     print("Enabling Flash Encryption...")
 
