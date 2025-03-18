@@ -47,7 +47,11 @@ def extract_firmware(firmware_path):
 
 
 def enable_secure_boot(port, baud_rate, flasher_args, extract_dir):
-    """Enables Secure Boot if configured and signs the firmware binaries."""
+    """
+    Enables Secure Boot if configured and signs the firmware binaries.
+
+    More details: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/security/host-based-security-workflows.html#introduction
+    """
 
     secure_boot_config = load_config().get("secure_boot", {})
     if secure_boot_config is None:
@@ -109,7 +113,11 @@ def enable_secure_boot(port, baud_rate, flasher_args, extract_dir):
 
 
 def enable_flash_encryption(port, flasher_args, extract_dir):
-    """Enables Flash Encryption if configured."""
+    """
+    Enables Flash Encryption if configured.
+
+    More details: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/security/host-based-security-workflows.html#introduction
+    """
     flash_config = load_config().get("flash_encryption", {})
 
     if flash_config is None:
