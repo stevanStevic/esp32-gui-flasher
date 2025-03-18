@@ -16,7 +16,7 @@ from esp_flasher.core.const import HTTP_REGEX
 
 # pylint: disable=unspecified-encoding,consider-using-with
 DEVNULL = open(os.devnull, "w")
-CONFIG_PATH = "config/.config"
+CONFIG_PATH = "config/config.json"
 
 
 def open_downloadable_binary(path):
