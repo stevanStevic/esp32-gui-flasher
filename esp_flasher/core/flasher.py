@@ -6,6 +6,7 @@ from esp_flasher.core.firmware_utils import (
     enable_flash_encryption,
     configure_write_flash_args,
 )
+from esp_flasher.helpers.utils import Esp_flasherError
 
 
 def run_esp_flasher(port, firmware, baud_rate=115200, no_erase=True):
@@ -14,8 +15,8 @@ def run_esp_flasher(port, firmware, baud_rate=115200, no_erase=True):
     flasher_args, extract_dir = extract_firmware(firmware_path=firmware)
     firmware_args = configure_write_flash_args(flasher_args, extract_dir)
 
+    enable_flash_encryption(port, baud_rate, flasher_args, extract_dir)
     enable_secure_boot(port, baud_rate, flasher_args, extract_dir)
-    # enable_flash_encryption()
 
     # Base esptool command
     esptool_cmd = [

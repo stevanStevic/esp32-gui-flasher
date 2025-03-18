@@ -53,10 +53,14 @@ def enable_secure_boot(port, baud_rate, flasher_args, extract_dir):
     if secure_boot_config is None:
         return  # Secure config not good, skip
 
-    # Now check the actual release
+    # Now check the configuration from the actual release
     security = flasher_args.get("security", {})
     if security is None:
-        return  # Security in release not enabled, skip
+        return  # Security in release not added.
+
+    secure_boot_enabled = security.get("secure_boot", False)
+    if secure_boot_enabled is False:
+        return  # Secure boot not enabled, skip
 
     # If release has security enabled then we need to specify block for digest flashing.
     # this can be extended to support multi-digest signing etc.
@@ -104,31 +108,56 @@ def enable_secure_boot(port, baud_rate, flasher_args, extract_dir):
     print("Secure boot eFuse enabled successfully.")
 
 
-def enable_flash_encryption(chip):
+def enable_flash_encryption(port, flasher_args, extract_dir):
     """Enables Flash Encryption if configured."""
     flash_config = load_config().get("flash_encryption", {})
 
     if flash_config is None:
         return  # Encryption config not good, skip
 
-    if not flash_config.get("flash_encryption_en", False):
-        return  # Flash encryption not enabled, skip
+    # Now check the configuration from the actual release
+    security = flasher_args.get("security", {}).get("")
+    if security is None:
+        return  # Security in release not enabled, skip
+
+    encryption_enabled = security.get("encryption", False)
+    if encryption_enabled is False:
+        return  # Secure boot not enabled, skip
 
     print("Enabling Flash Encryption...")
-    key_path = flash_config.get("flash_encryption_use_customer_key_path")
 
-    if not flash_config.get("flash_encryption_use_customer_key_enable", False):
+    key_file = ""
+    if flash_config.get("flash_encryption_use_customer_key_enable", False):
+        key_file = flash_config.get("flash_encryption_use_customer_key_path")
+    else:
         # Generate encryption key if not user-specified
-        key_path = "generated_flash_encrypt_key.bin"
-        espsecure.main(["generate_flash_encryption_key", key_path])
+        key_file = os.path.join(extract_dir, "flash_encrypt_key.bin")
+        espsecure.main(["generate_flash_encryption_key", key_file])
 
-    if not os.path.exists(key_path):
-        raise Esp_flasherError(f"Flash encryption key not found: {key_path}")
+    if not os.path.exists(key_file):
+        raise Esp_flasherError(f"Flash encryption key not found: {key_file}")
+
+    # If release has encryption enabled then we need to specify block for encryption key.
+    # This can be extended to support multi encryption keys.
+    if flash_config.get("encryption_key_block_index", None) is None:
+        raise Esp_flasherError(f"Encryption key block not specified!")
+
+    block_idx = flash_config.get("encryption_key_block_index")
 
     # Flash encryption key using espefuse
-    espefuse.main(["--chip", chip.CHIP_NAME, "burn_key", "flash_encryption", key_path])
+    espefuse.main(
+        [
+            "--do-not-confirm",
+            "--port",
+            str(port),
+            "burn_key",
+            f"BLOCK_KEY{block_idx}",
+            key_file,
+            "XTS_AES_128_KEY",
+        ]
+    )
 
-    print("Flash Encryption enabled successfully.")
+    print("Flash Encryption key flashed successfully.")
 
 
 def configure_write_flash_args(flasher_args, extract_dir):
