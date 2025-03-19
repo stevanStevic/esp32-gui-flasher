@@ -51,6 +51,11 @@ def run_esp_flasher(port, firmware, baud_rate=115200, no_erase=True):
 
     try:
         esptool.main(esptool_cmd)
+
+        # Burn the security fuses and write protect
+        if encryption_enabled and secure_boot_enabled:
+            burn_and_protect_security_efuses(port)
+
     except esptool.FatalError as err:
         raise Esp_flasherError(f"Error while writing flash: {err}")
     except Exception as e:

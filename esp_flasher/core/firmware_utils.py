@@ -140,19 +140,81 @@ def enable_flash_encryption(port, flasher_args, extract_dir):
     block_idx = flash_config.get("encryption_key_block_index")
 
     # Flash encryption key using espefuse
-    espefuse.main(
-        [
-            "--do-not-confirm",
-            "--port",
-            str(port),
-            "burn_key",
-            f"BLOCK_KEY{block_idx}",
-            key_file,
-            "XTS_AES_128_KEY",
-        ]
-    )
+def burn_and_protect_security_efuses(port):
+    """
+    Burns multiple security eFuses and applies write protection to prevent modification.
+    More details: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/security/host-based-security-workflows.html#introduction
 
-    print("Flash Encryption key flashed successfully.")
+    Args:
+        port (str): Serial port of the ESP32S3 device (e.g., "/dev/ttyUSB0").
+
+    Raises:
+        Exception: If the eFuse burning process fails.
+    """
+
+    # eFuses to burn (security settings)
+    security_efuses = {
+        "DIS_DOWNLOAD_ICACHE": "0x1",  # Disable UART instruction cache
+        "DIS_DOWNLOAD_DCACHE": "0x1",  # Disable UART data cache
+        "HARD_DIS_JTAG": "0x1",  # Hard disable JTAG peripheral
+        "SOFT_DIS_JTAG": "0x1",  # Disable software access to JTAG
+        "DIS_DIRECT_BOOT": "0x1",  # Disable direct boot (legacy SPI boot mode)
+        "DIS_USB_JTAG": "0x1",  # Disable USB switch to JTAG
+        "DIS_DOWNLOAD_MANUAL_ENCRYPT": "0x1",  # Disable UART bootloader encryption access
+        "SECURE_BOOT_AGGRESSIVE_REVOKE": "0x1",  # Aggressive revocation of key digests
+    }
+
+    print("Burning security eFuses...")
+
+    # Construct a single espefuse command with all eFuses
+    burn_command = [
+        "--do-not-confirm",
+        "--port",
+        str(port),
+        "burn_efuse",
+    ]
+
+    # Append each eFuse and its value
+    for efuse, value in security_efuses.items():
+        burn_command.append(efuse)
+        burn_command.append(value)
+
+    print("Running eFuse burning command:")
+    print(f"espefuse.py {' '.join(burn_command)}")
+
+    try:
+        espefuse.main(burn_command)
+        print("All security eFuses burned successfully.")
+    except Exception as e:
+        print(f"Error while burning eFuses: {e}")
+        raise
+
+    # **Step 2: Write-Protect Security eFuses**
+    print("\nApplying write protection to security eFuses...")
+
+    write_protect_efuses = [
+        "DIS_ICACHE",  # Write-protects multiple security configurations
+        "RD_DIS",  # Prevents accidental read protection of Secure Boot digest
+    ]
+
+    for efuse in write_protect_efuses:
+        print(f"Writing protection for {efuse}...")
+        try:
+            espefuse.main(
+                [
+                    "--do-not-confirm",
+                    "--port",
+                    str(port),
+                    "write_protect_efuse",
+                    efuse,
+                ]
+            )
+            print(f"{efuse} write-protected successfully.")
+        except Exception as e:
+            print(f"Failed to write-protect {efuse}: {e}")
+            raise
+
+    print("\nSecurity eFuses burned and write-protected successfully.")
 
 
 def configure_write_flash_args(flasher_args, extract_dir):
