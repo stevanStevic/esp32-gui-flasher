@@ -128,6 +128,21 @@ def enable_flash_encryption(app_config, port, extract_dir):
     block_idx = app_config.get("encryption_key_block_index")
 
     # Flash encryption key using espefuse
+    espefuse.main(
+        [
+            "--do-not-confirm",
+            "--port",
+            str(port),
+            "burn_key",
+            f"BLOCK_KEY{block_idx}",
+            key_file,
+            "XTS_AES_128_KEY",
+        ]
+    )
+
+    print("Flash Encryption key flashed successfully.")
+
+
 def burn_and_protect_security_efuses(port):
     """
     Burns multiple security eFuses and applies write protection to prevent modification.
