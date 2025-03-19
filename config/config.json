@@ -3,6 +3,7 @@
         "public_key_digest_block_index": 0
     },
     "flash_encryption": {
+        "encryption_en": false,
         "encryption_key_block_index": 1,
         "flash_encryption_use_customer_key_enable": true,
         "flash_encryption_use_customer_key_path": "keys/flash_encrypt_key.bin"

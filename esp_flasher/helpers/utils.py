@@ -68,13 +68,11 @@ def prevent_print(func, *args, **kwargs):
 def load_config(path=CONFIG_PATH):
     """Loads configuration from the .config JSON file."""
     if not os.path.exists(path):
-        print("Config file not found, using defaults.")
-        return {}
+        raise Esp_flasherError(f"Config file {path} not found.")
 
     try:
         with open(path, "r") as config_file:
             config = json.load(config_file)
             return config
     except json.JSONDecodeError as e:
-        print(f"Error parsing config file: {e}")
-        return {}
+        raise Esp_flasherError(f"Error parsing config file: {e}")

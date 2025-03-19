@@ -1,29 +1,44 @@
 import esptool
 
 from esp_flasher.core.firmware_utils import (
+    burn_and_protect_security_efuses,
     extract_firmware,
     enable_secure_boot,
     enable_flash_encryption,
     configure_write_flash_args,
 )
-from esp_flasher.helpers.utils import Esp_flasherError
+from esp_flasher.helpers.utils import Esp_flasherError, load_config
 
 
-def run_esp_flasher(port, firmware, baud_rate=115200, no_erase=True):
+def run_esp_flasher(port, firmware, baud_rate=115200):
     """Runs the ESP flashing process, integrating secure boot and encryption."""
 
+    app_config = load_config()
     flasher_args, extract_dir = extract_firmware(firmware_path=firmware)
     firmware_args = configure_write_flash_args(flasher_args, extract_dir)
 
-    # Now check the configuration from the actual release
-    encryption_enabled = flasher_args.get("security", {}).get("encryption", False)
+    app_encryption_enabled = app_config.get("flash_encryption", {}).get(
+        "encryption_en", False
+    )
+    release_encryption_enabled = flasher_args.get("security", {}).get(
+        "encryption", False
+    )
+    encryption_enabled = app_encryption_enabled or release_encryption_enabled
     if encryption_enabled:
-        enable_flash_encryption(port, flasher_args, extract_dir)
+        enable_flash_encryption(
+            app_config.get("flash_encryption", {}), port, extract_dir
+        )
 
     # Now check the configuration from the actual release
     secure_boot_enabled = flasher_args.get("security", {}).get("secure_boot", False)
     if secure_boot_enabled:
-        enable_secure_boot(port, baud_rate, flasher_args, extract_dir)
+        enable_secure_boot(
+            app_config.get("secure_boot", {}),
+            port,
+            baud_rate,
+            flasher_args,
+            extract_dir,
+        )
 
     # Base esptool command
     esptool_cmd = [

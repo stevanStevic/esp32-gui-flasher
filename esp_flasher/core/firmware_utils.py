@@ -46,31 +46,23 @@ def extract_firmware(firmware_path):
     return flasher_args, temp_dir
 
 
-def enable_secure_boot(port, baud_rate, flasher_args, extract_dir):
+def enable_secure_boot(app_config, port, baud_rate, flasher_args, extract_dir):
     """
     Enables Secure Boot if configured and signs the firmware binaries.
 
     More details: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/security/host-based-security-workflows.html#introduction
     """
 
-    secure_boot_config = load_config().get("secure_boot", {})
-    if secure_boot_config is None:
-        return  # Secure config not good, skip
-
-    # Now check the configuration from the actual release
-    security = flasher_args.get("security", {})
-    if security is None:
-        return  # Security in release not added.
+    print("Enabling Secure Boot...")
 
     # If release has security enabled then we need to specify block for digest flashing.
     # this can be extended to support multi-digest signing etc.
-    if secure_boot_config.get("public_key_digest_block_index", None) is None:
+    if app_config.get("public_key_digest_block_index", None) is None:
         raise Esp_flasherError(f"Public key digest block not specified!")
 
-    block_idx = secure_boot_config.get("public_key_digest_block_index")
+    block_idx = app_config.get("public_key_digest_block_index")
 
-    print("Enabling Secure Boot...")
-    digest_path = security.get("digest_file", "")
+    digest_path = flasher_args.get("security", {}).get("digest_file", "")
     digest_file = os.path.join(extract_dir, digest_path)
     if not os.path.exists(digest_file):
         raise Esp_flasherError(f"Public key digest file not found: {digest_file}")
@@ -108,22 +100,18 @@ def enable_secure_boot(port, baud_rate, flasher_args, extract_dir):
     print("Secure boot eFuse enabled successfully.")
 
 
-def enable_flash_encryption(port, flasher_args, extract_dir):
+def enable_flash_encryption(app_config, port, extract_dir):
     """
     Enables Flash Encryption if configured.
 
     More details: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/security/host-based-security-workflows.html#introduction
     """
-    flash_config = load_config().get("flash_encryption", {})
-
-    if flash_config is None:
-        return  # Encryption config not good, skip
 
     print("Enabling Flash Encryption...")
 
     key_file = ""
-    if flash_config.get("flash_encryption_use_customer_key_enable", False):
-        key_file = flash_config.get("flash_encryption_use_customer_key_path")
+    if app_config.get("flash_encryption_use_customer_key_enable", False):
+        key_file = app_config.get("flash_encryption_use_customer_key_path")
     else:
         # Generate encryption key if not user-specified
         key_file = os.path.join(extract_dir, "flash_encrypt_key.bin")
@@ -134,10 +122,10 @@ def enable_flash_encryption(port, flasher_args, extract_dir):
 
     # If release has encryption enabled then we need to specify block for encryption key.
     # This can be extended to support multi encryption keys.
-    if flash_config.get("encryption_key_block_index", None) is None:
+    if app_config.get("encryption_key_block_index", None) is None:
         raise Esp_flasherError(f"Encryption key block not specified!")
 
-    block_idx = flash_config.get("encryption_key_block_index")
+    block_idx = app_config.get("encryption_key_block_index")
 
     # Flash encryption key using espefuse
 def burn_and_protect_security_efuses(port):
