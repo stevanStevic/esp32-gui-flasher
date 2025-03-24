@@ -43,6 +43,11 @@ class LogThread(QThread):
 
         try:
             with serial.Serial(self._port, baudrate=115200, timeout=1) as serial_port:
+                # Prevent ESP32 from staying in bootloader mode
+                serial_port.setDTR(False)
+                serial_port.setRTS(False)
+                time.sleep(0.1)  # Give it a moment to settle
+
                 while self._running:
                     if serial_port.in_waiting > 0:  # Check if data is available
                         raw = serial_port.readline()
