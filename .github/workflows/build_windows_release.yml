@@ -3,6 +3,9 @@ name: Build & Release Windows EXE
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write # Ensure GitHub Actions can create releases
+
 jobs:
   build-windows:
     name: Build and Release ESP32-Flasher
@@ -25,39 +28,33 @@ jobs:
         run: |
           python -m PyInstaller.__main__ -F -w -n ESP32-Flasher -i icon.ico esp_flasher\__main__.py
 
-      - name: Copy config.json to dist
-        run: copy config\config.json dist\config.json
-
-      - name: Extract version from const.py
-        id: get_version
-        shell: python
+      - name: Create config folder in dist and copy config.json
         run: |
-          import re
-          version_file = open("esp_flasher/core/const.py").read()
-          version = re.search(r'__version__\s*=\s*["\'](.+?)["\']', version_file).group(1)
-          print(f"::set-output name=version::{version}")
-        # GitHub deprecated set-output, use this instead:
-        continue-on-error: true
+          mkdir dist\config
+          copy config\config.json dist\config\config.json
 
-      - name: Set version fallback (from tag)
-        if: steps.get_version.outputs.version == ''
-        run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+      - name: Create ZIP package
+        run: |
+          powershell Compress-Archive -Path dist\ESP32-Flasher.exe, dist\config\ -DestinationPath dist\ESP32-Flasher-Windows.zip
 
-      - name: Set version from file
-        if: steps.get_version.outputs.version != ''
-        run: echo "VERSION=${{ steps.get_version.outputs.version }}" >> $GITHUB_ENV
+      - name: Determine release version
+        id: version
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "latest-$(git rev-parse --short HEAD)")
+          echo "release_version=$TAG" >> $GITHUB_OUTPUT
+        shell: bash
 
-      - name: Archive release artifact
+      - name: Upload artifact (ZIP)
         uses: actions/upload-artifact@v4
         with:
-          name: ESP32-Flasher-Windows
-          path: dist/
+          name: ESP32-Flasher-Windows-ZIP
+          path: dist/ESP32-Flasher-Windows.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ env.VERSION }}
-          name: ESP32-Flasher v${{ env.VERSION }}
-          files: dist/ESP32-Flasher.exe
+          tag_name: v${{ steps.version.outputs.release_version }}
+          name: ESP32-Flasher v${{ steps.version.outputs.release_version }}
+          files: dist/ESP32-Flasher-Windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
