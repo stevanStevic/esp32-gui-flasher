@@ -1,0 +1,63 @@
+name: Build & Release Windows EXE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build and Release ESP32-Flasher
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements_build.txt -r requirements.txt
+
+      - name: Build executable with PyInstaller
+        run: |
+          python -m PyInstaller.__main__ -F -w -n ESP32-Flasher -i icon.ico esp_flasher\__main__.py
+
+      - name: Copy config.json to dist
+        run: copy config\config.json dist\config.json
+
+      - name: Extract version from const.py
+        id: get_version
+        shell: python
+        run: |
+          import re
+          version_file = open("esp_flasher/core/const.py").read()
+          version = re.search(r'__version__\s*=\s*["\'](.+?)["\']', version_file).group(1)
+          print(f"::set-output name=version::{version}")
+        # GitHub deprecated set-output, use this instead:
+        continue-on-error: true
+
+      - name: Set version fallback (from tag)
+        if: steps.get_version.outputs.version == ''
+        run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Set version from file
+        if: steps.get_version.outputs.version != ''
+        run: echo "VERSION=${{ steps.get_version.outputs.version }}" >> $GITHUB_ENV
+
+      - name: Archive release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ESP32-Flasher-Windows
+          path: dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: ESP32-Flasher v${{ env.VERSION }}
+          files: dist/ESP32-Flasher.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
