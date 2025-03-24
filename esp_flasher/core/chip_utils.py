@@ -159,7 +159,6 @@ def detect_chip(port, baud=115200):
         chip = esptool.get_default_connected_device(
             serial_list=[port], port=port, connect_attempts=1, initial_baud=baud
         )
-        chip.connect()
         return chip
     except esptool.FatalError as err:
         raise Esp_flasherError(f"ESP Chip Auto-Detection failed: {err}") from err
