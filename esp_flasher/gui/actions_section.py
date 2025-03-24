@@ -54,9 +54,6 @@ class ActionsSection(QGroupBox):
         """Starts logging only if flashing was successful."""
         self.cleanup_flashing_thread()
 
-        if success:
-            self.view_logs()
-
     def cleanup_flashing_thread(self):
         """Cleans up the flashing thread after completion."""
         self.flashing_thread = None
