@@ -37,7 +37,7 @@ setup(
     url=GITHUB_URL,
     author=PROJECT_AUTHOR,
     author_email=PROJECT_EMAIL,
-    description="ESP32 GUI Flash Download Tool with Connection to Thermal Printer.",
+    description="ESP32 GUI Flash Download Tool with Connection to Printer.",
     include_package_data=True,
     zip_safe=False,
     platforms="any",
@@ -51,5 +51,5 @@ setup(
     long_description_content_type="text/markdown",
     keywords=["esp32", "automation", "flash"],
     entry_points={"console_scripts": ["esp_flasher = esp_flasher.__main__:main"]},
-    packages=find_packages(include="esprelease.*"),
+    packages=find_packages(),
 )
