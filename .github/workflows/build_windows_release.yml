@@ -22,12 +22,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements_build.txt -r requirements.txt
+          pip install -r requirements_build.txt -r requirements.txt -r requirements_win.txt
 
       - name: Build executable with PyInstaller
         run: |
-          python -m PyInstaller.__main__ -F -w -n ESP32-Flasher -i icon.ico --hidden-import win32ui --hidden-import win32print esp_flasher\__main__.py
-          
+          python -m PyInstaller.__main__ -F -w -n ESP32-Flasher -i icon.ico --hidden-import pywin32 esp_flasher\__main__.py
+
       - name: Create config folder in dist and copy config.json
         run: |
           mkdir dist\config

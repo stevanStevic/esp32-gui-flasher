@@ -1,4 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal
+from esp_flasher.__main__ import run_esp_flasher
 
 
 class FlashingThread(QThread):
@@ -14,7 +15,6 @@ class FlashingThread(QThread):
     def run(self):
         """Executes the flashing process safely."""
         try:
-            from esp_flasher.__main__ import run_esp_flasher
 
             run_esp_flasher(self._port, self._firmware, baud_rate=460800)
 

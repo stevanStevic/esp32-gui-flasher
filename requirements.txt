@@ -5,4 +5,4 @@ distro>=1.9.0
 esptool==4.8.1
 brother-ql==0.9.4
 bitstring==3.1.7
-pywin32
+flask==3.1.0

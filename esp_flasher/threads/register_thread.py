@@ -1,4 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal
+from esp_flasher.backend.api_client import publish_mac_address
 
 
 class RegisterThread(QThread):
@@ -15,7 +16,6 @@ class RegisterThread(QThread):
     def run(self):
         """Publishes MAC address and handles API response."""
         try:
-            from esp_flasher.backend.api_client import publish_mac_address
 
             device_name, error_message = publish_mac_address(
                 self._api_endpoint, self._api_key, self._api_secret, self._mac
