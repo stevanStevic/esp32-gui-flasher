@@ -78,3 +78,4 @@ class ActionsSection(QGroupBox):
         """Stops log monitoring using LogThread."""
         if self.log_thread:
             self.log_thread.stop_logging()
+            self.log_thread = None
