@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QTextEdit,
 )
 from PyQt5.QtGui import QIcon, QColor, QPalette
+from PyQt5.QtWidgets import QMessageBox
 
 from esp_flasher.gui.printer_config import PrinterConfig
 from esp_flasher.gui.port_config import PortConfig
@@ -17,6 +18,15 @@ from esp_flasher.gui.actions_section import ActionsSection
 from esp_flasher.helpers.redirect_text import RedirectText
 from esp_flasher.helpers.utils import load_config
 from esp_flasher.core.const import __version__
+
+
+def show_error_popup(message, parent=None):
+    """Displays an error popup with the given message."""
+    msg = QMessageBox(parent)
+    msg.setIcon(QMessageBox.Critical)
+    msg.setText(message)
+    msg.setWindowTitle("Error")
+    msg.exec_()
 
 
 class MainWindow(QMainWindow):

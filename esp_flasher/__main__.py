@@ -24,7 +24,7 @@ def run(argv):
 def main():
     try:
         if len(sys.argv) <= 1:
-            from esp_flasher.gui.main_window import MainWindow
+            from esp_flasher.gui.main_window import MainWindow, show_error_popup
             from PyQt5.QtWidgets import QApplication
 
             app = QApplication(sys.argv)
@@ -35,7 +35,10 @@ def main():
         else:
             return run(sys.argv)
     except Exception as err:
-        print(f"Error: {str(err)}")
+        if len(sys.argv) <= 1:
+            show_error_popup(f"An error occurred: {str(err)}")
+        else:
+            print(f"An error occurred: {str(err)}")
         return 1
     except KeyboardInterrupt:
         return 1
