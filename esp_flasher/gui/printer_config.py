@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QLabel,
     QComboBox,
     QSpinBox,
+    QLineEdit,
 )
 from esp_flasher.helpers.printer_utils import list_available_printers
 from esp_flasher.threads.printing_thread import PrintingThread
@@ -83,15 +84,24 @@ class PrinterConfig(QGroupBox):
         offset_layout.addWidget(self.y_offset_spinbox)
 
         # Test Print Button
+        test_print_layout = QHBoxLayout()
+        custom_print_label = QLabel("Print Text:")
+        self.custom_print_input = QLineEdit()
+        self.custom_print_input.setText("Test Print - ESP Flasher")
+
         test_print_button = QPushButton("Test Print")
         test_print_button.clicked.connect(self.test_print)
+
+        test_print_layout.addWidget(custom_print_label)
+        test_print_layout.addWidget(self.custom_print_input)
+        test_print_layout.addWidget(test_print_button)
 
         layout.addLayout(printer_layout)
         layout.addLayout(width_layout)
         layout.addLayout(font_size_layout)
         layout.addLayout(rotation_layout)
         layout.addLayout(offset_layout)
-        layout.addWidget(test_print_button)
+        layout.addLayout(test_print_layout)
         self.setLayout(layout)
 
     def refresh_printer_list(self):
@@ -113,7 +123,6 @@ class PrinterConfig(QGroupBox):
             self.parent.show_message("Error: No printer selected!")
             return
 
-        message = "Test Print - ESP Flasher"
         label_width = self.width_spinbox.value()
         font_size = self.font_size_spinbox.value()
         text_rotation = self.rotation_spinbox.value()
@@ -124,7 +133,7 @@ class PrinterConfig(QGroupBox):
 
         self.print_thread = PrintingThread(
             printer_name,
-            message,
+            self.custom_print_input.text(),
             label_width,
             x_offset,
             y_offset,
