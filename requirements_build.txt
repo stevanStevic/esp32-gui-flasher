@@ -1,4 +1,3 @@
 pyinstaller>=4.8
 wheel
 setuptools
-flask
