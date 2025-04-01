@@ -67,7 +67,7 @@ class ActionsSection(QGroupBox):
         self.parent.console.clear()
         self.parent.show_message("Starting log monitoring...")
 
-        if not self.log_thread:
+        if self.log_thread is None:
             self.log_thread = LogThread(self.parent._chip_port)
             self.log_thread.log_signal.connect(self.parent.show_colored_message)
             self.log_thread.error_signal.connect(self.parent.show_message)
