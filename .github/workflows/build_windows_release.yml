@@ -35,11 +35,7 @@ jobs:
           copy "$esptoolPath\targets\*" ".\esp_flasher\esptool\targets\" -Recurse -Force
 
       - name: Build executable with PyInstaller
-        run: |
-          python -m PyInstaller.__main__ -F -w -n ESP32-Flasher -i icon.ico ^
-            --hidden-import pywin32 ^
-            --add-data "esp_flasher\esptool\targets;esptool/targets" ^
-            esp_flasher\__main__.py
+        run: python -m PyInstaller.__main__ -F -w -n ESP32-Flasher -i icon.ico --hidden-import pywin32 --add-data "esp_flasher\esptool\targets;esptool/targets" esp_flasher\__main__.py
 
       - name: Create config folder in dist and copy config.json
         run: |
