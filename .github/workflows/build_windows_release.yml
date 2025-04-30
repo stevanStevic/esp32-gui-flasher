@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # Ensure GitHub Actions can create releases
+  contents: write
 
 jobs:
   build-windows:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all tags for versioning
+          fetch-depth: 0
           submodules: recursive
 
       - name: Set up Python
@@ -26,22 +26,19 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements_build.txt -r requirements.txt -r requirements_win.txt
-          pip uninstall -y esptool
-          pip install git+https://github.com/espressif/esptool.git@v4.8.1
 
-      - name: Find esptool path and copy stub_flasher
-        id: find-esptool
+      - name: Find esptool path and copy stub files for all chips
         run: |
           $esptoolPath = python -c "import esptool, os; print(os.path.dirname(esptool.__file__))"
           echo "Found esptool at $esptoolPath"
-          mkdir -Force .\esp_flasher\esptool\stub_flasher
-          copy "$esptoolPath\stub_flasher\*" ".\esp_flasher\esptool\stub_flasher\" -Recurse -Force
+          mkdir -Force .\esp_flasher\esptool\targets
+          copy "$esptoolPath\targets\*" ".\esp_flasher\esptool\targets\" -Recurse -Force
 
       - name: Build executable with PyInstaller
         run: |
           python -m PyInstaller.__main__ -F -w -n ESP32-Flasher -i icon.ico ^
             --hidden-import pywin32 ^
-            --add-data "esp_flasher\esptool\stub_flasher;esptool/stub_flasher" ^
+            --add-data "esp_flasher\esptool\targets;esptool/targets" ^
             esp_flasher\__main__.py
 
       - name: Create config folder in dist and copy config.json
