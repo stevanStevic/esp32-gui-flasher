@@ -26,6 +26,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements_build.txt -r requirements.txt -r requirements_win.txt
+          pip uninstall -y esptool
+          pip install git+https://github.com/espressif/esptool.git@v4.8.1
 
       - name: Find esptool path and copy stub_flasher
         id: find-esptool
