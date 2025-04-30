@@ -54,7 +54,6 @@ class LogThread(QThread):
                         text = raw.decode(errors="ignore").strip()
                         text, color = self.parse_ansi_colors(text)  # Decode color
                         self.log_signal.emit(text, color)  # Emit formatted log
-                    time.sleep(0.1)
         except serial.SerialException as e:
             self.error_signal.emit(f"Serial Error: {str(e)}")
         except Exception as e:
