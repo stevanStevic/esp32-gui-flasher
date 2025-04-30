@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # Ensure GitHub Actions can create releases
+  contents: write
 
 jobs:
   build-windows:
@@ -15,8 +15,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all tags for versioning
-          submodules: "recursive"
+          fetch-depth: 0
+          submodules: recursive
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,9 +27,15 @@ jobs:
         run: |
           pip install -r requirements_build.txt -r requirements.txt -r requirements_win.txt
 
-      - name: Build executable with PyInstaller
+      - name: Find esptool path and copy stub files for all chips
         run: |
-          python -m PyInstaller.__main__ -F -w -n ESP32-Flasher -i icon.ico --hidden-import pywin32 esp_flasher\__main__.py
+          $esptoolPath = python -c "import esptool, os; print(os.path.dirname(esptool.__file__))"
+          echo "Found esptool at $esptoolPath"
+          mkdir -Force .\esp_flasher\esptool\targets
+          copy "$esptoolPath\targets\*" ".\esp_flasher\esptool\targets\" -Recurse -Force
+
+      - name: Build executable with PyInstaller
+        run: python -m PyInstaller.__main__ -F -w -n ESP32-Flasher -i icon.ico --hidden-import pywin32 --add-data "esp_flasher\esptool\targets;esptool/targets" esp_flasher\__main__.py
 
       - name: Create config folder in dist and copy config.json
         run: |
