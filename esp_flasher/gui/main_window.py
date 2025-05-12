@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,  # Add QHBoxLayout
     QGroupBox,
     QTextEdit,
 )
@@ -99,7 +100,12 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        layout = QVBoxLayout()
+        # Main horizontal layout
+        main_layout = QHBoxLayout()
+
+        # Left vertical layout for controls
+        left_layout_widget = QWidget()
+        left_layout = QVBoxLayout()
 
         self.port_config = PortConfig(self)
         self.printer_config = PrinterConfig(self)
@@ -108,6 +114,16 @@ class MainWindow(QMainWindow):
         self.firmware_section = FirmwareSection(self)
         self.actions_section = ActionsSection(self)
 
+        left_layout.addWidget(self.port_config)
+        left_layout.addWidget(self.printer_config)
+        left_layout.addWidget(self.backend_config)
+        left_layout.addWidget(self.chip_info_section)
+        left_layout.addWidget(self.firmware_section)
+        left_layout.addWidget(self.actions_section)
+        left_layout.addStretch()  # Add stretch to push widgets to the top
+        left_layout_widget.setLayout(left_layout)
+
+        # Console on the right
         self.console_group_box = QGroupBox("Console")
         console_layout = QVBoxLayout()
         self.console = QTextEdit()
@@ -115,15 +131,11 @@ class MainWindow(QMainWindow):
         console_layout.addWidget(self.console)
         self.console_group_box.setLayout(console_layout)
 
-        layout.addWidget(self.port_config)
-        layout.addWidget(self.printer_config)
-        layout.addWidget(self.backend_config)
-        layout.addWidget(self.chip_info_section)
-        layout.addWidget(self.firmware_section)
-        layout.addWidget(self.actions_section)
-        layout.addWidget(self.console_group_box)
+        # Add left and right sections to the main layout
+        main_layout.addWidget(left_layout_widget, 1)  # Assign a stretch factor of 1
+        main_layout.addWidget(self.console_group_box, 1)  # Assign a stretch factor of 1
 
-        central_widget.setLayout(layout)
+        central_widget.setLayout(main_layout)
 
     def apply_dark_theme(self):
         palette = QPalette()
