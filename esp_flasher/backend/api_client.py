@@ -27,11 +27,17 @@ def publish_mac_address(
             )
 
     except HTTPError as http_err:
-        response_data = http_err.response.json()
+        # Try to get JSON error message, fallback to text or default message
+        response = http_err.response
+        try:
+            response_data = response.json()
+            message = response_data.get("message", str(response_data))
+        except Exception:
+            message = response.text if response is not None else "No response body"
 
         return (
             None,
-            f"HTTP error: {response.status_code} {response.reason} - {response_data['message']}",
+            f"HTTP error: {response.status_code} {response.reason} - {message}",
         )
     except RequestException as req_err:
         return None, f"Request failed: {req_err}"

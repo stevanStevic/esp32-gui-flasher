@@ -1,10 +1,10 @@
+import logging
 from PyQt5.QtCore import QThread, pyqtSignal
 from esp_flasher.backend.api_client import publish_mac_address
 
 
 class RegisterThread(QThread):
     device_name_signal = pyqtSignal(str)  # Signal for successful registration
-    error_signal = pyqtSignal(str)  # Signal for error handling
 
     def __init__(self, api_endpoint, api_key, api_secret, mac_address):
         super().__init__()
@@ -26,7 +26,7 @@ class RegisterThread(QThread):
                     device_name
                 )  # Emit device name if successful
             else:
-                self.error_signal.emit(error_message)  # Emit error if request failed
+                logging.error(error_message)  # Emit error if request failed
 
         except Exception as e:
-            self.error_signal.emit(f"Unexpected error: {e}")  # Handle unexpected errors
+            logging.error(f"Unexpected error: {e}")  # Handle unexpected errors

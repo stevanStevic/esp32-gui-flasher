@@ -1,5 +1,4 @@
-from __future__ import print_function
-
+import datetime
 import io
 import json
 import os
@@ -76,3 +75,29 @@ def load_config(path=CONFIG_PATH):
             return config
     except json.JSONDecodeError as e:
         raise Esp_flasherError(f"Error parsing config file: {e}")
+
+
+def get_device_dir(device_name=None, mac_address=None):
+    """Generate a directory path based on device name, mac address, or 'unknown'."""
+    if device_name:
+        dir_name = device_name
+    elif mac_address:
+        dir_name = mac_address.replace(":", "_")
+    else:
+        dir_name = "unknown"
+    base_dir = os.getcwd()
+    device_dir = os.path.join(base_dir, dir_name)
+    os.makedirs(device_dir, exist_ok=True)
+    return device_dir
+
+
+def get_flash_log_path(device_dir):
+    """Generate a unique log file path for flashing."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return os.path.join(device_dir, f"flashing_{timestamp}.log")
+
+
+def get_testing_log_path(device_dir):
+    """Generate a unique log file path for testing."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return os.path.join(device_dir, f"testing_{timestamp}.log")

@@ -6,7 +6,7 @@ def dump_info(port):
         chip = detect_chip(port)
         info = read_chip_info(chip)
 
-        print("\nChip Information:")
+        print("Chip Information:")
         print(f" - Chip Family: {info.family}")
         print(f" - Model: {info.model}")
         print(f" - Cores: {info.num_cores}")

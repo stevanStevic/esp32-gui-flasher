@@ -26,6 +26,9 @@ Non-essential options are hidden, making the process accessible for beginners wh
     - [Chip Info and Device Registration](#chip-info-and-device-registration)
     - [Flashing the ESP32](#flashing-the-esp32)
     - [Printing a Device Label](#printing-a-device-label)
+  - [Automated Testing and Log File Management](#automated-testing-and-log-file-management)
+    - [Automated Device Testing](#automated-device-testing)
+    - [Log File Handling During Testing](#log-file-handling-during-testing)
   - [Configuration and Options](#configuration-and-options)
     - [Configuration File (`config.json`)](#configuration-file-configjson)
     - [Secure vs. Regular Firmware Flashing](#secure-vs-regular-firmware-flashing)
@@ -34,6 +37,7 @@ Non-essential options are hidden, making the process accessible for beginners wh
   - [License](#license)
   - [Known Issues and Limitations](#known-issues-and-limitations)
   - [Contact \& Support](#contact--support)
+
 
 ## <a name="overview"></a>Overview
 
@@ -311,6 +315,23 @@ If you are not using the **Register** feature but still want to print a label:
 In either case, attach the printed label to your device. You now have a physically labeled ESP32 device corresponding to the firmware you just flashed.
 
 This workflow is especially useful when flashing many devices in sequence: you can flash, get info, register, print, and move to the next device, knowing each one is labeled and recorded.
+
+
+## <a name="automated-testing-and-log-file-management"></a>Automated Testing and Log File Management</a>
+
+### Automated Device Testing
+- **Testing Trigger:** After a successful device flash, the application can automatically start a device test, based on the configuration in `config/config.json` (see the `testing_settings` section).
+- **Manual Testing:** A button labeled **"Test Device"** has been added to the Actions section. This allows users to manually trigger a test at any time, regardless of the automatic test logic.
+
+### Log File Handling During Testing
+- **Flashing:**
+User flashes device; a `flashing_<timestamp>.log` file is created.
+- **Testing Log Files:** When a test is started (either automatically after flashing or manually), a new log file is created in the device’s directory. The file is named `testing_<timestamp>.log` (e.g., `testing_20250518_191850.log`).
+- **Log File Location:** The log file is saved in the directory corresponding to the device name or MAC address (e.g., `TEST_NAME/` or `unknown/`).
+- **Log File Lifecycle:**
+  - The log file is opened and set as the active log destination at the start of testing.
+  - All log output during the test is written to this file.
+  - When the test ends, the log file is closed and logging returns to its default state.
 
 ## <a name="configuration-and-options"></a>Configuration and Options
 

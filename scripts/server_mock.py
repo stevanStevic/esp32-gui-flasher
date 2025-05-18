@@ -9,7 +9,7 @@ def mock_publish():
     if "mac_address" in data:
         return (
             jsonify({"device_name": "TEST_NAME"}),
-            200,
+            201,
         )
     else:
         return jsonify({"message": "Missing MAC address"}), 400

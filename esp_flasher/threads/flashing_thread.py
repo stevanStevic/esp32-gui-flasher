@@ -1,3 +1,4 @@
+import logging
 from PyQt5.QtCore import QThread, pyqtSignal
 from esp_flasher.__main__ import run_esp_flasher
 
@@ -18,8 +19,8 @@ class FlashingThread(QThread):
 
             run_esp_flasher(self._port, self._firmware, baud_rate=460800)
 
-            self.success_signal.emit("Flashing completed successfully!")
+            logging.info("Flashing completed successfully!")
             self.finished_signal.emit(True)  # Notify ActionsSection of success
         except Exception as e:
-            self.error_signal.emit(f"Flashing Error: {str(e)}")
+            logging.error(f"Flashing Error: {str(e)}")
             self.finished_signal.emit(False)

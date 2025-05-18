@@ -4,6 +4,7 @@ from esp_flasher.cli.logging import show_logs
 from esp_flasher.core.flasher import run_esp_flasher
 from esp_flasher.cli.chip_info import dump_info
 from esp_flasher.helpers.serial_utils import select_port
+from PyQt5.QtWidgets import QMessageBox
 
 
 def run(argv):
@@ -24,7 +25,7 @@ def run(argv):
 def main():
     try:
         if len(sys.argv) <= 1:
-            from esp_flasher.gui.main_window import MainWindow, show_error_popup
+            from esp_flasher.gui.main_window import MainWindow, show_popup
             from PyQt5.QtWidgets import QApplication
 
             app = QApplication(sys.argv)
@@ -36,7 +37,7 @@ def main():
             return run(sys.argv)
     except Exception as err:
         if len(sys.argv) <= 1:
-            show_error_popup(f"An error occurred: {str(err)}")
+            show_popup("Error", f"An error occurred: {str(err)}", QMessageBox.Critical)
         else:
             print(f"An error occurred: {str(err)}")
         return 1

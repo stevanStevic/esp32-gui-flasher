@@ -1,3 +1,4 @@
+import logging
 from PyQt5.QtWidgets import (
     QGroupBox,
     QVBoxLayout,
@@ -120,7 +121,7 @@ class PrinterConfig(QGroupBox):
         """Sends a test print job to the selected printer."""
         printer_name = self.printer_combobox.currentText()
         if not printer_name or printer_name == "No printers found":
-            self.parent.show_message("Error: No printer selected!")
+            logging.error("No printer selected!")
             return
 
         label_width = self.width_spinbox.value()
@@ -140,6 +141,4 @@ class PrinterConfig(QGroupBox):
             text_rotation,
             font_size,
         )
-        self.print_thread.success_signal.connect(self.parent.show_message)
-        self.print_thread.error_signal.connect(self.parent.show_message)
         self.print_thread.start()

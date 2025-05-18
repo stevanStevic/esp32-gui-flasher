@@ -1,10 +1,10 @@
+import logging
 from PyQt5.QtCore import QThread, pyqtSignal
 from esp_flasher.backend.printer import get_printer
 
 
 class PrintingThread(QThread):
     success_signal = pyqtSignal(str)
-    error_signal = pyqtSignal(str)
 
     def __init__(
         self,
@@ -37,6 +37,6 @@ class PrintingThread(QThread):
                 text_rotation=self.text_rotation,
                 font_size=self.font,
             )
-            self.success_signal.emit(result)
+            logging.info(result)
         except Exception as e:
-            self.error_signal.emit(f"Printing Error: {str(e)}")
+            logging.error(f"Printing Error: {str(e)}")

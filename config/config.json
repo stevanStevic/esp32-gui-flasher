@@ -22,5 +22,11 @@
         "api_endpoint": "http://127.0.0.1:5000/publish",
         "api_key": "TEST_KEY",
         "api_secret": "TEST_SECRET"
+    },
+    "testing_settings": {
+        "enabled": true,
+        "test_board_xth_occurrence": 2,
+        "test_success_regex": "Multicore\\s+app",
+        "test_timeout_seconds": 10
     }
 }
