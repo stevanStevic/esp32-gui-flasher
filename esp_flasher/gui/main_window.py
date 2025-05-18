@@ -21,6 +21,7 @@ from esp_flasher.core.const import __version__
 import logging
 from esp_flasher.helpers.log_handler import FlashLogHandler, StdoutRedirector
 from esp_flasher.model.test_module import TestModule
+from esp_flasher.helpers.resource_helper import resource_path
 
 
 def show_popup(title, message, icon, parent=None):
@@ -28,7 +29,7 @@ def show_popup(title, message, icon, parent=None):
     msg = QMessageBox(parent)
     msg.setIcon(icon)
     msg.setText(message)
-    msg.setWindowIcon(QIcon("icon.ico"))
+    msg.setWindowIcon(QIcon(resource_path("icon.ico")))
     msg.setWindowTitle(title)
     msg.exec_()
 
@@ -137,7 +138,7 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         self.setWindowTitle(f"ESP32-GUI-Flasher with Printer Support {__version__}")
         self.setGeometry(100, 100, 1200, 800)
-        self.setWindowIcon(QIcon("icon.ico"))
+        self.setWindowIcon(QIcon(resource_path("icon.ico")))
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -204,7 +205,7 @@ class MainWindow(QMainWindow):
         self.testing_popup.setIcon(QMessageBox.Warning)
         self.testing_popup.setText(message)
         self.testing_popup.setWindowTitle("Testing")
-        self.testing_popup.setWindowIcon(QIcon("icon.ico"))
+        self.testing_popup.setWindowIcon(QIcon(resource_path("icon.ico")))
         self.testing_popup.setStandardButtons(QMessageBox.NoButton)
         self.testing_popup.show()
 
