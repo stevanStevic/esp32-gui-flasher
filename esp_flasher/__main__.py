@@ -37,7 +37,10 @@ def main():
             return run(sys.argv)
     except Exception as err:
         if len(sys.argv) <= 1:
-            show_popup("Error", f"An error occurred: {str(err)}", QMessageBox.Critical)
+            try:
+                show_popup("Error", f"An error occurred: {str(err)}", QMessageBox.Critical)
+            except NameError:
+                print(f"An error occurred: {str(err)}")
         else:
             print(f"An error occurred: {str(err)}")
         return 1
