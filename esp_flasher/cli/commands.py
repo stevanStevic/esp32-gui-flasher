@@ -4,6 +4,10 @@ from esp_flasher.core.const import __version__
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(prog=f"esp_flasher {__version__}")
+    parser.add_argument(
+        "--gui", action="store_true",
+        help="Launch the GUI. When set, all other flags are ignored."
+    )
     parser.add_argument("-p", "--port", help="Select the USB/COM port for uploading.")
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument(

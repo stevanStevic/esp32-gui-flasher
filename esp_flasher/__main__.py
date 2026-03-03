@@ -22,30 +22,40 @@ def run(argv):
     run_esp_flasher(port, args.firmware, args.upload_baud_rate, args.no_erase)
 
 
-def main():
-    try:
-        if len(sys.argv) <= 1:
-            from esp_flasher.gui.main_window import MainWindow, show_popup
-            from PyQt5.QtWidgets import QApplication
+def launch_gui():
+    from esp_flasher.gui.main_window import MainWindow
+    from PyQt5.QtWidgets import QApplication
 
-            app = QApplication(sys.argv)
-            app.setStyle("Fusion")
-            main_window = MainWindow()
-            main_window.show()
-            sys.exit(app.exec_())
-        else:
-            return run(sys.argv)
-    except Exception as err:
-        if len(sys.argv) <= 1:
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    main_window = MainWindow()
+    main_window.show()
+    sys.exit(app.exec_())
+
+
+def main():
+    args = parse_args(sys.argv)
+
+    if args.gui:
+        try:
+            launch_gui()
+        except Exception as err:
             try:
+                from esp_flasher.gui.main_window import show_popup
                 show_popup("Error", f"An error occurred: {str(err)}", QMessageBox.Critical)
-            except NameError:
+            except Exception:
                 print(f"An error occurred: {str(err)}")
-        else:
+            return 1
+        except KeyboardInterrupt:
+            return 1
+    else:
+        try:
+            return run(sys.argv)
+        except Exception as err:
             print(f"An error occurred: {str(err)}")
-        return 1
-    except KeyboardInterrupt:
-        return 1
+            return 1
+        except KeyboardInterrupt:
+            return 1
 
 
 if __name__ == "__main__":
