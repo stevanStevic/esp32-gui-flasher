@@ -22,13 +22,15 @@ def run(argv):
     run_esp_flasher(port, args.firmware, args.upload_baud_rate, args.no_erase)
 
 
-def launch_gui():
+def launch_gui(enable_registration_and_printing=False):
     from esp_flasher.gui.main_window import MainWindow
     from PyQt5.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    main_window = MainWindow()
+    main_window = MainWindow(
+        enable_registration_and_printing=enable_registration_and_printing
+    )
     main_window.show()
     sys.exit(app.exec_())
 
@@ -38,7 +40,9 @@ def main():
 
     if args.gui:
         try:
-            launch_gui()
+            launch_gui(
+                enable_registration_and_printing=args.enable_device_registration_and_printing
+            )
         except Exception as err:
             try:
                 from esp_flasher.gui.main_window import show_popup

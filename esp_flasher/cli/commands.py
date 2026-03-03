@@ -21,4 +21,9 @@ def parse_args(argv):
     parser.add_argument(
         "--info-dump", action="store_true", help="Only show device info"
     )
+    parser.add_argument(
+        "--enable-device-registration-and-printing",
+        action="store_true",
+        help="Enable device registration and printing section in the GUI.",
+    )
     return parser.parse_args(argv[1:])

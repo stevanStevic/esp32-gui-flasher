@@ -22,9 +22,6 @@ class ActionsSection(QGroupBox):
     def init_ui(self):
         layout = QHBoxLayout()
 
-        self.flash_button = QPushButton("Flash ESP (4)")
-        self.flash_button.clicked.connect(self.flash_esp)
-
         self.logs_button = QPushButton("View Logs")
         self.logs_button.clicked.connect(self.view_logs)
 
@@ -34,7 +31,6 @@ class ActionsSection(QGroupBox):
         self.test_button = QPushButton("Test Device")
         self.test_button.clicked.connect(self.manual_test_device)
 
-        layout.addWidget(self.flash_button)
         layout.addWidget(self.logs_button)
         layout.addWidget(self.clear_button)
         layout.addWidget(self.test_button)

@@ -3,16 +3,14 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,  # Add QHBoxLayout
+    QHBoxLayout,
     QGroupBox,
     QTextEdit,
 )
 from PyQt5.QtGui import QIcon, QColor, QPalette
 from PyQt5.QtWidgets import QMessageBox
 
-from esp_flasher.gui.printer_config import PrinterConfig
 from esp_flasher.gui.port_config import PortConfig
-from esp_flasher.gui.backend_config import BackendConfig
 from esp_flasher.gui.chip_info import ChipInfoSection
 from esp_flasher.gui.firmware_section import FirmwareSection
 from esp_flasher.gui.actions_section import ActionsSection
@@ -35,18 +33,18 @@ def show_popup(title, message, icon, parent=None):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, enable_registration_and_printing=False):
         super().__init__()
         import sys
         import traceback
 
         def excepthook(type, value, tb):
             traceback.print_exception(type, value, tb)
-            # Optionally, call the default handler:
             sys.__excepthook__(type, value, tb)
 
         sys.excepthook = excepthook
 
+        self._enable_registration_and_printing = enable_registration_and_printing
         self._firmware = None
         self._chip_port = None
         self._printer_port = None
@@ -55,68 +53,68 @@ class MainWindow(QMainWindow):
         self._api_secret = ""
         self._mac_address = None
         self._device_name = ""
-        self._successful_flash_count = 0  # Add this line
-        self._testing_enabled = False  # Add this line
-        self._test_board_xth_occurrence = 0  # Add this line
-        self._test_success_regex = ""  # Add this line
-        self._is_testing_active = False  # Add this line to track testing state
-        self._test_timeout_seconds = 30  # Default timeout
-        # Load config and instantiate model after config is loaded
-        self.test_module = None  # Will be set after config
+        self._successful_flash_count = 0
+        self._testing_enabled = False
+        self._test_board_xth_occurrence = 0
+        self._test_success_regex = ""
+        self._is_testing_active = False
+        self._test_timeout_seconds = 30
+        self.test_module = None
+        self.registration_printing_section = None
 
         self.init_ui()
 
         self.log_handler = FlashLogHandler(text_edit=None)
         logging.basicConfig(level=logging.INFO, handlers=[self.log_handler])
         logging.getLogger().addHandler(self.log_handler)
-        self.log_handler.text_edit = self.console  # Attach after QTextEdit is created
+        self.log_handler.text_edit = self.console
         sys.stdout = StdoutRedirector(logging.getLogger(), logging.INFO)
         sys.stderr = StdoutRedirector(logging.getLogger(), logging.ERROR)
 
-        self.apply_config_to_gui()  # Load configuration into GUI
+        self.apply_config_to_gui()
         self.apply_dark_theme()
 
     def apply_config_to_gui(self):
         """Applies loaded config values to GUI elements."""
         config = load_config()
 
-        # Apply printer settings
-        printer_settings = config.get("printer_settings", {})
-        self.printer_config.printer_combobox.setCurrentText(
-            printer_settings.get("default_printer", "")
-        )
-        self.printer_config.width_spinbox.setValue(
-            printer_settings.get("label_width", 62)
-        )
-        self.printer_config.font_size_spinbox.setValue(
-            printer_settings.get("font_size", 20)
-        )
-        self.printer_config.rotation_spinbox.setValue(
-            printer_settings.get("text_rotation", 270)
-        )
-        self.printer_config.x_offset_spinbox.setValue(
-            printer_settings.get("x_offset", 100)
-        )
-        self.printer_config.y_offset_spinbox.setValue(
-            printer_settings.get("y_offset", 100)
-        )
+        # Apply printer/backend settings only if registration & printing is enabled
+        if self._enable_registration_and_printing and self.registration_printing_section:
+            printer_settings = config.get("printer_settings", {})
+            self.registration_printing_section.printer_combobox.setCurrentText(
+                printer_settings.get("default_printer", "")
+            )
+            self.registration_printing_section.width_spinbox.setValue(
+                printer_settings.get("label_width", 62)
+            )
+            self.registration_printing_section.font_size_spinbox.setValue(
+                printer_settings.get("font_size", 20)
+            )
+            self.registration_printing_section.rotation_spinbox.setValue(
+                printer_settings.get("text_rotation", 270)
+            )
+            self.registration_printing_section.x_offset_spinbox.setValue(
+                printer_settings.get("x_offset", 100)
+            )
+            self.registration_printing_section.y_offset_spinbox.setValue(
+                printer_settings.get("y_offset", 100)
+            )
+
+            api_settings = config.get("api_settings", {})
+            self.registration_printing_section.line_edits["_api_endpoint"].setText(
+                api_settings.get("api_endpoint", "")
+            )
+            self.registration_printing_section.line_edits["_api_key"].setText(
+                api_settings.get("api_key", "")
+            )
+            self.registration_printing_section.line_edits["_api_secret"].setText(
+                api_settings.get("api_secret", "")
+            )
 
         # Apply chip port and firmware path
         self.port_config.chip_port_combobox.setCurrentText(config.get("chip_port", ""))
         self._firmware = config.get("firmware_path", "")
         self.firmware_section.firmware_button.setText(self._firmware)
-
-        # Apply API settings
-        api_settings = config.get("api_settings", {})
-        self.backend_config.line_edits["_api_endpoint"].setText(
-            api_settings.get("api_endpoint", "")
-        )
-        self.backend_config.line_edits["_api_key"].setText(
-            api_settings.get("api_key", "")
-        )
-        self.backend_config.line_edits["_api_secret"].setText(
-            api_settings.get("api_secret", "")
-        )
 
         # Apply testing settings
         testing_settings = config.get("testing_settings", {})
@@ -136,7 +134,11 @@ class MainWindow(QMainWindow):
         )
 
     def init_ui(self):
-        self.setWindowTitle(f"ESP32-GUI-Flasher with Printer Support {__version__}")
+        title = "ESP32-GUI-Flasher"
+        if self._enable_registration_and_printing:
+            title += " with Printer Support"
+        title += f" {__version__}"
+        self.setWindowTitle(title)
         self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(resource_path("icon.ico")))
 
@@ -151,19 +153,33 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout()
 
         self.port_config = PortConfig(self)
-        self.printer_config = PrinterConfig(self)
-        self.backend_config = BackendConfig(self)
         self.chip_info_section = ChipInfoSection(self)
         self.firmware_section = FirmwareSection(self)
         self.actions_section = ActionsSection(self)
 
+        # Connect the flash button (now in firmware_section) to actions_section.flash_esp
+        self.firmware_section.flash_button.clicked.connect(self.actions_section.flash_esp)
+
+        # Order: Port Config -> Chip Info -> [Optional: Registration & Printing] -> Firmware -> Actions
         left_layout.addWidget(self.port_config)
-        left_layout.addWidget(self.printer_config)
-        left_layout.addWidget(self.backend_config)
         left_layout.addWidget(self.chip_info_section)
+
+        if self._enable_registration_and_printing:
+            from esp_flasher.gui.registration_printing_section import (
+                RegistrationPrintingSection,
+            )
+
+            self.registration_printing_section = RegistrationPrintingSection(self)
+            left_layout.addWidget(self.registration_printing_section)
+            # With printing enabled: Flash ESP (4)
+            self.firmware_section.flash_button.setText("Flash ESP (4)")
+        else:
+            # Without printing: Flash ESP (2)
+            self.firmware_section.flash_button.setText("Flash ESP (2)")
+
         left_layout.addWidget(self.firmware_section)
         left_layout.addWidget(self.actions_section)
-        left_layout.addStretch()  # Add stretch to push widgets to the top
+        left_layout.addStretch()
         left_layout_widget.setLayout(left_layout)
 
         # Console on the right
@@ -175,8 +191,8 @@ class MainWindow(QMainWindow):
         self.console_group_box.setLayout(console_layout)
 
         # Add left and right sections to the main layout
-        main_layout.addWidget(left_layout_widget, 1)  # Assign a stretch factor of 1
-        main_layout.addWidget(self.console_group_box, 1)  # Assign a stretch factor of 1
+        main_layout.addWidget(left_layout_widget, 1)
+        main_layout.addWidget(self.console_group_box, 1)
 
         central_widget.setLayout(main_layout)
 
