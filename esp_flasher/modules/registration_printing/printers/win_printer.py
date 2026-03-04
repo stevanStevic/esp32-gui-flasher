@@ -1,6 +1,6 @@
 import win32ui
 import win32con
-from esp_flasher.backend.printers.base_printer import BasePrinter
+from esp_flasher.modules.registration_printing.printers.base_printer import BasePrinter
 
 
 class WindowsPrinter(BasePrinter):

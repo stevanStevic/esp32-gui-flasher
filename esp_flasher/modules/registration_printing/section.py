@@ -9,9 +9,9 @@ from PyQt5.QtWidgets import (
     QSpinBox,
     QLineEdit,
 )
-from esp_flasher.helpers.printer_utils import list_available_printers
-from esp_flasher.threads.printing_thread import PrintingThread
-from esp_flasher.threads.register_thread import RegisterThread
+from esp_flasher.modules.registration_printing.printer_utils import list_available_printers
+from esp_flasher.modules.registration_printing.threads.printing_thread import PrintingThread
+from esp_flasher.modules.registration_printing.threads.register_thread import RegisterThread
 
 
 class RegistrationPrintingSection(QGroupBox):
@@ -141,9 +141,9 @@ class RegistrationPrintingSection(QGroupBox):
         layout.addWidget(actions_label)
 
         actions_layout = QHBoxLayout()
-        self.register_button = QPushButton("Register Device (2)")
+        self.register_button = QPushButton("Register Device")
         self.register_button.clicked.connect(self.register)
-        self.print_button = QPushButton("Print (3)")
+        self.print_button = QPushButton("Print")
         self.print_button.clicked.connect(self.print_device)
         actions_layout.addWidget(self.register_button)
         actions_layout.addWidget(self.print_button)

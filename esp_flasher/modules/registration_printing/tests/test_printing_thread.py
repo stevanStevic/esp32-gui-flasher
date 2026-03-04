@@ -1,4 +1,4 @@
-"""Tests for esp_flasher.threads.printing_thread module."""
+"""Tests for registration_printing module: printing_thread."""
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -7,10 +7,10 @@ import pytest
 class TestPrintingThread:
     """Tests for PrintingThread class."""
 
-    @patch("esp_flasher.threads.printing_thread.QThread.__init__", return_value=None)
+    @patch("esp_flasher.modules.registration_printing.threads.printing_thread.QThread.__init__", return_value=None)
     def test_construction_defaults(self, mock_init):
         """Default parameters are stored correctly."""
-        from esp_flasher.threads.printing_thread import PrintingThread
+        from esp_flasher.modules.registration_printing.threads.printing_thread import PrintingThread
 
         thread = PrintingThread("Brother_QL-600", "DEV_001")
 
@@ -22,10 +22,10 @@ class TestPrintingThread:
         assert thread.text_rotation == 270
         assert thread.font == 20
 
-    @patch("esp_flasher.threads.printing_thread.QThread.__init__", return_value=None)
+    @patch("esp_flasher.modules.registration_printing.threads.printing_thread.QThread.__init__", return_value=None)
     def test_construction_custom(self, mock_init):
         """Custom parameters are stored correctly."""
-        from esp_flasher.threads.printing_thread import PrintingThread
+        from esp_flasher.modules.registration_printing.threads.printing_thread import PrintingThread
 
         thread = PrintingThread(
             "HP_Printer",
@@ -45,11 +45,11 @@ class TestPrintingThread:
         assert thread.text_rotation == 90
         assert thread.font == 14
 
-    @patch("esp_flasher.threads.printing_thread.QThread.__init__", return_value=None)
-    @patch("esp_flasher.threads.printing_thread.get_printer")
+    @patch("esp_flasher.modules.registration_printing.threads.printing_thread.QThread.__init__", return_value=None)
+    @patch("esp_flasher.modules.registration_printing.threads.printing_thread.get_printer")
     def test_run_success(self, mock_get_printer, mock_init):
         """Successful run calls get_printer and print_label with correct args."""
-        from esp_flasher.threads.printing_thread import PrintingThread
+        from esp_flasher.modules.registration_printing.threads.printing_thread import PrintingThread
 
         mock_printer = MagicMock()
         mock_printer.print_label.return_value = "Print job sent successfully."
@@ -76,11 +76,11 @@ class TestPrintingThread:
             font_size=10,
         )
 
-    @patch("esp_flasher.threads.printing_thread.QThread.__init__", return_value=None)
-    @patch("esp_flasher.threads.printing_thread.get_printer")
+    @patch("esp_flasher.modules.registration_printing.threads.printing_thread.QThread.__init__", return_value=None)
+    @patch("esp_flasher.modules.registration_printing.threads.printing_thread.get_printer")
     def test_run_error_logged(self, mock_get_printer, mock_init):
         """Errors during printing are logged, not raised."""
-        from esp_flasher.threads.printing_thread import PrintingThread
+        from esp_flasher.modules.registration_printing.threads.printing_thread import PrintingThread
 
         mock_get_printer.side_effect = ValueError("Unsupported OS")
 
@@ -89,11 +89,11 @@ class TestPrintingThread:
         # Should not raise
         thread.run()
 
-    @patch("esp_flasher.threads.printing_thread.QThread.__init__", return_value=None)
-    @patch("esp_flasher.threads.printing_thread.get_printer")
+    @patch("esp_flasher.modules.registration_printing.threads.printing_thread.QThread.__init__", return_value=None)
+    @patch("esp_flasher.modules.registration_printing.threads.printing_thread.get_printer")
     def test_run_print_error_logged(self, mock_get_printer, mock_init):
         """Error from print_label is logged, not raised."""
-        from esp_flasher.threads.printing_thread import PrintingThread
+        from esp_flasher.modules.registration_printing.threads.printing_thread import PrintingThread
 
         mock_printer = MagicMock()
         mock_printer.print_label.side_effect = RuntimeError("Paper jam")

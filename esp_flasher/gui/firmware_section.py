@@ -14,7 +14,7 @@ class FirmwareSection(QGroupBox):
         self.firmware_button = QPushButton("Browse")
         self.firmware_button.clicked.connect(self.pick_file)
 
-        self.flash_button = QPushButton("Flash ESP (2)")
+        self.flash_button = QPushButton("Flash ESP")
 
         layout.addWidget(firmware_label, 0, 0)
         layout.addWidget(self.firmware_button, 0, 1)

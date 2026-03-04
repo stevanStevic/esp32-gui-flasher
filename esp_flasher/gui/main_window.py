@@ -1,4 +1,6 @@
 import sys
+import logging
+
 from PyQt5.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -14,12 +16,14 @@ from esp_flasher.gui.port_config import PortConfig
 from esp_flasher.gui.chip_info import ChipInfoSection
 from esp_flasher.gui.firmware_section import FirmwareSection
 from esp_flasher.gui.actions_section import ActionsSection
+from esp_flasher.gui.module_loader import load_modules
 from esp_flasher.helpers.utils import load_config
 from esp_flasher.core.const import __version__
-import logging
 from esp_flasher.helpers.log_handler import FlashLogHandler, StdoutRedirector
 from esp_flasher.model.test_module import TestModule
 from esp_flasher.helpers.resource_helper import resource_path
+
+logger = logging.getLogger(__name__)
 
 
 def show_popup(title, message, icon, parent=None):
@@ -33,7 +37,7 @@ def show_popup(title, message, icon, parent=None):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, enable_registration_and_printing=False):
+    def __init__(self, module_paths=None):
         super().__init__()
         import sys
         import traceback
@@ -44,7 +48,8 @@ class MainWindow(QMainWindow):
 
         sys.excepthook = excepthook
 
-        self._enable_registration_and_printing = enable_registration_and_printing
+        self._module_paths = module_paths or []
+        self._modules = []
         self._firmware = None
         self._chip_port = None
         self._printer_port = None
@@ -60,7 +65,6 @@ class MainWindow(QMainWindow):
         self._is_testing_active = False
         self._test_timeout_seconds = 30
         self.test_module = None
-        self.registration_printing_section = None
 
         self.init_ui()
 
@@ -78,38 +82,12 @@ class MainWindow(QMainWindow):
         """Applies loaded config values to GUI elements."""
         config = load_config()
 
-        # Apply printer/backend settings only if registration & printing is enabled
-        if self._enable_registration_and_printing and self.registration_printing_section:
-            printer_settings = config.get("printer_settings", {})
-            self.registration_printing_section.printer_combobox.setCurrentText(
-                printer_settings.get("default_printer", "")
-            )
-            self.registration_printing_section.width_spinbox.setValue(
-                printer_settings.get("label_width", 62)
-            )
-            self.registration_printing_section.font_size_spinbox.setValue(
-                printer_settings.get("font_size", 20)
-            )
-            self.registration_printing_section.rotation_spinbox.setValue(
-                printer_settings.get("text_rotation", 270)
-            )
-            self.registration_printing_section.x_offset_spinbox.setValue(
-                printer_settings.get("x_offset", 100)
-            )
-            self.registration_printing_section.y_offset_spinbox.setValue(
-                printer_settings.get("y_offset", 100)
-            )
-
-            api_settings = config.get("api_settings", {})
-            self.registration_printing_section.line_edits["_api_endpoint"].setText(
-                api_settings.get("api_endpoint", "")
-            )
-            self.registration_printing_section.line_edits["_api_key"].setText(
-                api_settings.get("api_key", "")
-            )
-            self.registration_printing_section.line_edits["_api_secret"].setText(
-                api_settings.get("api_secret", "")
-            )
+        # Let each loaded module apply its own config
+        for module in self._modules:
+            try:
+                module.apply_config(config)
+            except Exception as exc:
+                logger.error(f"Module '{module.get_name()}' failed to apply config: {exc}")
 
         # Apply chip port and firmware path
         self.port_config.chip_port_combobox.setCurrentText(config.get("chip_port", ""))
@@ -134,10 +112,7 @@ class MainWindow(QMainWindow):
         )
 
     def init_ui(self):
-        title = "ESP32-GUI-Flasher"
-        if self._enable_registration_and_printing:
-            title += " with Printer Support"
-        title += f" {__version__}"
+        title = f"ESP32-GUI-Flasher {__version__}"
         self.setWindowTitle(title)
         self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(resource_path("icon.ico")))
@@ -160,22 +135,27 @@ class MainWindow(QMainWindow):
         # Connect the flash button (now in firmware_section) to actions_section.flash_esp
         self.firmware_section.flash_button.clicked.connect(self.actions_section.flash_esp)
 
-        # Order: Port Config -> Chip Info -> [Optional: Registration & Printing] -> Firmware -> Actions
+        # Order: Port Config -> Chip Info -> [Loaded Modules] -> Firmware -> Actions
         left_layout.addWidget(self.port_config)
         left_layout.addWidget(self.chip_info_section)
 
-        if self._enable_registration_and_printing:
-            from esp_flasher.gui.registration_printing_section import (
-                RegistrationPrintingSection,
-            )
+        # Load and insert extension modules
+        if self._module_paths:
+            try:
+                self._modules = load_modules(self._module_paths)
+            except Exception as exc:
+                logger.error(f"Failed to load modules: {exc}")
+                self._modules = []
 
-            self.registration_printing_section = RegistrationPrintingSection(self)
-            left_layout.addWidget(self.registration_printing_section)
-            # With printing enabled: Flash ESP (4)
-            self.firmware_section.flash_button.setText("Flash ESP (4)")
-        else:
-            # Without printing: Flash ESP (2)
-            self.firmware_section.flash_button.setText("Flash ESP (2)")
+            for module in self._modules:
+                try:
+                    section = module.create_section(self)
+                    left_layout.addWidget(section)
+                    logger.info(f"Module section added: {module.get_name()}")
+                except Exception as exc:
+                    logger.error(
+                        f"Module '{module.get_name()}' failed to create section: {exc}"
+                    )
 
         left_layout.addWidget(self.firmware_section)
         left_layout.addWidget(self.actions_section)
@@ -250,3 +230,12 @@ class MainWindow(QMainWindow):
     def close_log_file(self):
         if self.log_handler:
             self.log_handler.close()
+
+    def closeEvent(self, event):
+        """Dispose all loaded modules before closing."""
+        for module in self._modules:
+            try:
+                module.dispose()
+            except Exception as exc:
+                logger.error(f"Module '{module.get_name()}' dispose failed: {exc}")
+        super().closeEvent(event)

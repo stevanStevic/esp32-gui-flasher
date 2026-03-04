@@ -1,6 +1,6 @@
 import logging
 from PyQt5.QtCore import QThread, pyqtSignal
-from esp_flasher.backend.api_client import publish_mac_address
+from esp_flasher.modules.registration_printing.api_client import publish_mac_address
 
 
 class RegisterThread(QThread):

@@ -1,15 +1,15 @@
-"""Tests for esp_flasher.backend.api_client module."""
+"""Tests for registration_printing module: api_client."""
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from esp_flasher.backend.api_client import publish_mac_address
+from esp_flasher.modules.registration_printing.api_client import publish_mac_address
 
 
 class TestPublishMacAddress:
     """Tests for publish_mac_address function."""
 
-    @patch("esp_flasher.backend.api_client.requests.Session")
+    @patch("esp_flasher.modules.registration_printing.api_client.requests.Session")
     def test_success_201(self, mock_session_cls):
         """201 response with device_name returns (name, None)."""
         mock_response = MagicMock()
@@ -40,7 +40,7 @@ class TestPublishMacAddress:
         payload = call_kwargs[1]["json"]
         assert payload["mac_address"] == "AA:BB:CC:DD:EE:FF"
 
-    @patch("esp_flasher.backend.api_client.requests.Session")
+    @patch("esp_flasher.modules.registration_printing.api_client.requests.Session")
     def test_http_error(self, mock_session_cls):
         """HTTP error returns (None, error_message)."""
         from requests.exceptions import HTTPError
@@ -67,7 +67,7 @@ class TestPublishMacAddress:
         assert "HTTP error" in error
         assert "400" in error
 
-    @patch("esp_flasher.backend.api_client.requests.Session")
+    @patch("esp_flasher.modules.registration_printing.api_client.requests.Session")
     def test_connection_error(self, mock_session_cls):
         """Connection error returns (None, error_message)."""
         from requests.exceptions import ConnectionError as ReqConnectionError
@@ -85,7 +85,7 @@ class TestPublishMacAddress:
         assert name is None
         assert "Request failed" in error
 
-    @patch("esp_flasher.backend.api_client.requests.Session")
+    @patch("esp_flasher.modules.registration_printing.api_client.requests.Session")
     def test_unexpected_error(self, mock_session_cls):
         """Unexpected exception returns (None, error_message)."""
         mock_session = MagicMock()

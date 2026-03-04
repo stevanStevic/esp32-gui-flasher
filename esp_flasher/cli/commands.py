@@ -24,6 +24,17 @@ def parse_args(argv):
     parser.add_argument(
         "--enable-device-registration-and-printing",
         action="store_true",
-        help="Enable device registration and printing section in the GUI.",
+        help="[DEPRECATED] Use --load-module instead. Enables the built-in "
+             "registration and printing module.",
+    )
+    parser.add_argument(
+        "--load-module",
+        action="append",
+        default=[],
+        dest="load_modules",
+        metavar="PATH",
+        help="Path to a .py file containing a GUIModule subclass. "
+             "Can be specified multiple times to load several modules. "
+             "Modules are inserted into the GUI between Chip Info and Firmware sections.",
     )
     return parser.parse_args(argv[1:])

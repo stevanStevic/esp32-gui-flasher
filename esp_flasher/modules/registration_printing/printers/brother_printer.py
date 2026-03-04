@@ -1,4 +1,4 @@
-from esp_flasher.backend.printers.base_printer import BasePrinter
+from esp_flasher.modules.registration_printing.printers.base_printer import BasePrinter
 from brother_ql.raster import BrotherQLRaster
 from brother_ql.conversion import convert
 from brother_ql.backends.helpers import send

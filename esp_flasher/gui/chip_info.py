@@ -13,7 +13,7 @@ class ChipInfoSection(QGroupBox):
     def init_ui(self):
         layout = QHBoxLayout()
 
-        self.get_device_info_button = QPushButton("Get Device Info (1)")
+        self.get_device_info_button = QPushButton("Get Device Info")
         self.get_device_info_button.clicked.connect(self.get_device_info)
 
         layout.addWidget(self.get_device_info_button)

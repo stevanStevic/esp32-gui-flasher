@@ -1,6 +1,6 @@
 import logging
 from PyQt5.QtCore import QThread, pyqtSignal
-from esp_flasher.backend.printer import get_printer
+from esp_flasher.modules.registration_printing.printer import get_printer
 
 
 class PrintingThread(QThread):

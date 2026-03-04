@@ -1,4 +1,4 @@
-"""Tests for esp_flasher.backend.printers.brother_printer module."""
+"""Tests for registration_printing module: brother_printer and BasePrinter."""
 from unittest.mock import patch, MagicMock, call
 
 import pytest
@@ -7,12 +7,12 @@ import pytest
 class TestBrotherQLPrinter:
     """Tests for BrotherQLPrinter class."""
 
-    @patch("esp_flasher.backend.printers.brother_printer.send")
-    @patch("esp_flasher.backend.printers.brother_printer.convert")
-    @patch("esp_flasher.backend.printers.brother_printer.BrotherQLRaster")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.send")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.convert")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.BrotherQLRaster")
     def test_print_label_success(self, mock_raster_cls, mock_convert, mock_send):
         """Successful print creates raster, converts, and sends."""
-        from esp_flasher.backend.printers.brother_printer import BrotherQLPrinter
+        from esp_flasher.modules.registration_printing.printers.brother_printer import BrotherQLPrinter
 
         mock_ql = MagicMock()
         mock_raster_cls.return_value = mock_ql
@@ -42,12 +42,12 @@ class TestBrotherQLPrinter:
         )
         mock_send.assert_called_once_with(b"instructions", "Brother_QL-600")
 
-    @patch("esp_flasher.backend.printers.brother_printer.send")
-    @patch("esp_flasher.backend.printers.brother_printer.convert")
-    @patch("esp_flasher.backend.printers.brother_printer.BrotherQLRaster")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.send")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.convert")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.BrotherQLRaster")
     def test_print_label_default_params(self, mock_raster_cls, mock_convert, mock_send):
         """Default parameters are passed correctly to convert."""
-        from esp_flasher.backend.printers.brother_printer import BrotherQLPrinter
+        from esp_flasher.modules.registration_printing.printers.brother_printer import BrotherQLPrinter
 
         mock_convert.return_value = b"instructions"
 
@@ -63,12 +63,12 @@ class TestBrotherQLPrinter:
         assert call_args[1]["rotate"] == 270
         assert call_args[1]["threshold"] == 100
 
-    @patch("esp_flasher.backend.printers.brother_printer.send")
-    @patch("esp_flasher.backend.printers.brother_printer.convert")
-    @patch("esp_flasher.backend.printers.brother_printer.BrotherQLRaster")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.send")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.convert")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.BrotherQLRaster")
     def test_print_label_error(self, mock_raster_cls, mock_convert, mock_send):
         """Error during printing returns error message string."""
-        from esp_flasher.backend.printers.brother_printer import BrotherQLPrinter
+        from esp_flasher.modules.registration_printing.printers.brother_printer import BrotherQLPrinter
 
         mock_convert.side_effect = RuntimeError("Printer offline")
 
@@ -80,17 +80,17 @@ class TestBrotherQLPrinter:
 
     def test_inherits_base_printer(self):
         """BrotherQLPrinter should inherit from BasePrinter."""
-        from esp_flasher.backend.printers.base_printer import BasePrinter
-        from esp_flasher.backend.printers.brother_printer import BrotherQLPrinter
+        from esp_flasher.modules.registration_printing.printers.base_printer import BasePrinter
+        from esp_flasher.modules.registration_printing.printers.brother_printer import BrotherQLPrinter
 
         assert issubclass(BrotherQLPrinter, BasePrinter)
 
-    @patch("esp_flasher.backend.printers.brother_printer.send")
-    @patch("esp_flasher.backend.printers.brother_printer.convert")
-    @patch("esp_flasher.backend.printers.brother_printer.BrotherQLRaster")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.send")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.convert")
+    @patch("esp_flasher.modules.registration_printing.printers.brother_printer.BrotherQLRaster")
     def test_printer_name_stored(self, mock_raster_cls, mock_convert, mock_send):
         """Printer name is stored as instance attribute."""
-        from esp_flasher.backend.printers.brother_printer import BrotherQLPrinter
+        from esp_flasher.modules.registration_printing.printers.brother_printer import BrotherQLPrinter
 
         printer = BrotherQLPrinter("usb://0x04f9:0x20a7")
         assert printer.printer_name == "usb://0x04f9:0x20a7"
@@ -101,14 +101,14 @@ class TestBasePrinter:
 
     def test_cannot_instantiate(self):
         """BasePrinter cannot be instantiated directly."""
-        from esp_flasher.backend.printers.base_printer import BasePrinter
+        from esp_flasher.modules.registration_printing.printers.base_printer import BasePrinter
 
         with pytest.raises(TypeError):
             BasePrinter()
 
     def test_requires_print_label(self):
         """Subclass must implement print_label."""
-        from esp_flasher.backend.printers.base_printer import BasePrinter
+        from esp_flasher.modules.registration_printing.printers.base_printer import BasePrinter
 
         class IncompletePrinter(BasePrinter):
             pass
@@ -118,7 +118,7 @@ class TestBasePrinter:
 
     def test_complete_subclass(self):
         """Subclass implementing print_label can be instantiated."""
-        from esp_flasher.backend.printers.base_printer import BasePrinter
+        from esp_flasher.modules.registration_printing.printers.base_printer import BasePrinter
 
         class CompletePrinter(BasePrinter):
             def print_label(self, message, label_width, x_offset, y_offset, text_rotation, font_size):
