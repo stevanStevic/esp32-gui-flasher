@@ -22,12 +22,6 @@ def parse_args(argv):
         "--info-dump", action="store_true", help="Only show device info"
     )
     parser.add_argument(
-        "--enable-device-registration-and-printing",
-        action="store_true",
-        help="[DEPRECATED] Use --load-module instead. Enables the built-in "
-             "registration and printing module.",
-    )
-    parser.add_argument(
         "--load-module",
         action="append",
         default=[],
