@@ -101,6 +101,11 @@ class ActionsSection(QGroupBox):
             logging.error("No chip port selected!")
             return
 
+        # If port changed since the log thread was created, tear down the old one
+        if self.log_thread is not None and self.log_thread._port != self.parent._chip_port:
+            logging.info("Port changed, restarting log thread...")
+            self.stop_logs()
+
         self.parent.console.clear()
         logging.info("Starting log monitoring...")
 
