@@ -1,6 +1,6 @@
 import logging
 from PyQt5.QtCore import QThread, pyqtSignal
-from esp_flasher.__main__ import run_esp_flasher
+from esp_flasher.core.flasher import run_esp_flasher
 
 
 class FlashingThread(QThread):

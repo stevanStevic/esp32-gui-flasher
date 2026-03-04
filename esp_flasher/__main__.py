@@ -1,31 +1,11 @@
 import sys
 
 from esp_flasher.cli.commands import parse_args
-from esp_flasher.cli.logging import show_logs
-from esp_flasher.core.flasher import run_esp_flasher
-from esp_flasher.cli.chip_info import dump_info
-from esp_flasher.helpers.serial_utils import select_port
-from PyQt5.QtWidgets import QMessageBox
-
-
-def run(argv):
-    args = parse_args(argv)
-    port = select_port(args)
-
-    if args.show_logs:
-        show_logs(port)
-        return
-
-    if args.info_dump:
-        dump_info(port)
-        return
-
-    run_esp_flasher(port, args.firmware, args.upload_baud_rate, args.no_erase)
 
 
 def launch_gui(module_paths=None):
     from esp_flasher.gui.main_window import MainWindow
-    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtWidgets import QApplication, QMessageBox
 
     if module_paths is None:
         module_paths = []
@@ -37,29 +17,55 @@ def launch_gui(module_paths=None):
     sys.exit(app.exec_())
 
 
+_COMMAND_HANDLERS = {
+    "info":  "esp_flasher.cli.handlers:handle_info",
+    "flash": "esp_flasher.cli.handlers:handle_flash",
+    "logs":  "esp_flasher.cli.handlers:handle_logs",
+    "test":  "esp_flasher.cli.handlers:handle_test",
+}
+
+
+def _get_handler(command):
+    """Lazily import and return the handler for *command*."""
+    entry = _COMMAND_HANDLERS[command]
+    module_path, func_name = entry.split(":")
+    from importlib import import_module
+    mod = import_module(module_path)
+    return getattr(mod, func_name)
+
+
 def main():
     args = parse_args(sys.argv)
 
+    # ── GUI mode ─────────────────────────────────────────────────────
     if args.gui:
         try:
             launch_gui(module_paths=list(args.load_modules))
-        except Exception as err:
-            try:
-                from esp_flasher.gui.main_window import show_popup
-                show_popup("Error", f"An error occurred: {str(err)}", QMessageBox.Critical)
-            except Exception:
-                print(f"An error occurred: {str(err)}")
-            return 1
         except KeyboardInterrupt:
             return 1
-    else:
-        try:
-            return run(sys.argv)
         except Exception as err:
-            print(f"An error occurred: {str(err)}")
+            print(f"GUI error: {err}")
             return 1
-        except KeyboardInterrupt:
+        return 0
+
+    # ── CLI subcommand mode ──────────────────────────────────────────
+    if not args.command:
+        parse_args(["--help"])  # prints help and exits
+
+    try:
+        handler = _get_handler(args.command)
+        result = handler(args)
+        # handle_test returns False on failure
+        if result is False:
             return 1
+    except KeyboardInterrupt:
+        print()
+        return 1
+    except Exception as err:
+        print(f"Error: {err}")
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
