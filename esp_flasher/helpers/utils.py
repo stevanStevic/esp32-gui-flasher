@@ -1,51 +1,18 @@
 import datetime
-import io
 import os
 import sys
 
 import serial
 
-from esp_flasher.core.const import HTTP_REGEX
 from esp_flasher.core.errors import EspFlasherError
 
-# pylint: disable=unspecified-encoding,consider-using-with
-DEVNULL = open(os.devnull, "w")
-
-
-def open_downloadable_binary(path):
-    if hasattr(path, "seek"):
-        path.seek(0)
-        return path
-
-    if HTTP_REGEX.match(path) is not None:
-        import requests
-
-        try:
-            response = requests.get(path)
-            response.raise_for_status()
-        except requests.exceptions.Timeout as err:
-            raise EspFlasherError(
-                f"Timeout while retrieving firmware file '{path}': {err}"
-            ) from err
-        except requests.exceptions.RequestException as err:
-            raise EspFlasherError(
-                f"Error while retrieving firmware file '{path}': {err}"
-            ) from err
-
-        binary = io.BytesIO()
-        binary.write(response.content)
-        binary.seek(0)
-        return binary
-
-    try:
-        return open(path, "rb")
-    except IOError as err:
-        raise EspFlasherError(f"Error opening binary '{path}': {err}") from err
+_DEVNULL = open(os.devnull, "w")  # noqa: SIM115
 
 
 def prevent_print(func, *args, **kwargs):
+    """Call *func* while suppressing stdout (used to silence esptool)."""
     orig_sys_stdout = sys.stdout
-    sys.stdout = DEVNULL
+    sys.stdout = _DEVNULL
     try:
         return func(*args, **kwargs)
     except serial.SerialException as err:

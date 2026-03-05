@@ -13,7 +13,6 @@ class LogThread(QThread):
         super().__init__()
         self._port = port
         self._running = False
-        self._default_color = "white"
 
     def run(self):
         """Reads logs from the ESP device in a non-blocking way."""
@@ -31,11 +30,6 @@ class LogThread(QThread):
             self.error_signal.emit(str(e))
         except Exception as e:
             self.error_signal.emit(f"Log Error: {str(e)}")
-
-    def start_logging(self):
-        """Starts the logging process inside the thread."""
-        if not self.isRunning():
-            self.start()  # Start the QThread
 
     def stop_logging(self):
         """Stops log monitoring gracefully."""

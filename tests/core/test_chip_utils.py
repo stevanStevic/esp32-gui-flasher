@@ -7,7 +7,6 @@ from esp_flasher.core.chip import (
     EsptoolFlashArgs,
     ChipInfo,
     ESP32ChipInfo,
-    ESP8266ChipInfo,
     read_chip_info,
     read_chip_property,
     chip_run_stub,
@@ -35,7 +34,6 @@ class TestEsptoolFlashArgs:
         assert args.chip == "esp32s3"
         assert args.flash_size == "8MB"
         assert args.no_stub is False  # stub=True → no_stub=False
-        assert args.encrypt is False
         assert args.before == "default_reset"
         assert args.after == "hard_reset"
 
@@ -64,7 +62,6 @@ class TestChipInfoClasses:
         assert d["family"] == "ESP32"
         assert d["model"] == "ESP32-D0WDQ6"
         assert d["mac"] == "AA:BB:CC:DD:EE:FF"
-        assert d["is_esp32"] is None
 
     def test_esp32_chip_info_as_dict(self):
         info = ESP32ChipInfo(
@@ -83,16 +80,6 @@ class TestChipInfoClasses:
         assert d["has_bluetooth"] is True
         assert d["has_embedded_flash"] is False
         assert d["has_factory_calibrated_adc"] is True
-
-    def test_esp8266_chip_info_as_dict(self):
-        info = ESP8266ChipInfo(
-            model="ESP8266EX",
-            mac="11:22:33:44:55:66",
-            chip_id=12345,
-        )
-        d = info.as_dict()
-        assert d["family"] == "ESP8266"
-        assert d["chip_id"] == 12345
 
 
 class TestReadChipInfo:

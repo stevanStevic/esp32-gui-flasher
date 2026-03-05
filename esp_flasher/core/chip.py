@@ -26,7 +26,6 @@ class EsptoolFlashArgs:
         self.no_stub = not stub
         self.before = before
         self.after = after
-        self.encrypt = False
 
 
 class ChipInfo:
@@ -34,14 +33,12 @@ class ChipInfo:
         self.family = family
         self.model = model
         self.mac = mac
-        self.is_esp32 = None
 
     def as_dict(self):
         return {
             "family": self.family,
             "model": self.model,
             "mac": self.mac,
-            "is_esp32": self.is_esp32,
         }
 
 
@@ -72,21 +69,6 @@ class ESP32ChipInfo(ChipInfo):
                 "has_bluetooth": self.has_bluetooth,
                 "has_embedded_flash": self.has_embedded_flash,
                 "has_factory_calibrated_adc": self.has_factory_calibrated_adc,
-            }
-        )
-        return data
-
-
-class ESP8266ChipInfo(ChipInfo):
-    def __init__(self, model, mac, chip_id):
-        super().__init__("ESP8266", model, mac)
-        self.chip_id = chip_id
-
-    def as_dict(self):
-        data = ChipInfo.as_dict(self)
-        data.update(
-            {
-                "chip_id": self.chip_id,
             }
         )
         return data

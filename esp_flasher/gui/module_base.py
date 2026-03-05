@@ -40,10 +40,10 @@ class GUIModule(ABC):
 
         Args:
             state: The :class:`~esp_flasher.gui.app_state.AppState` instance.
-                   Use it to read/write shared application state such as
-                   ``state.mac_address``, ``state.chip_port``,
-                   ``state.firmware``, etc.  UI callbacks like
-                   ``state.show_error_popup()`` are also available.
+                   Use it to read shared application state (``state.mac_address``,
+                   ``state.chip_port``, ``state.firmware``, etc.) and UI callbacks
+                   (``state.show_error_popup()``).  Store module-specific data in
+                   ``state.module_data`` (a generic dict) to avoid coupling.
 
         Returns:
             A QGroupBox that will be added to the left panel of the GUI.

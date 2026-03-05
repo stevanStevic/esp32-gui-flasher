@@ -135,4 +135,3 @@ class ActionsSection(QGroupBox):
         self.state.close_testing_popup()
         self.stop_logs()
         self.state.close_log_file()
-        # self.test_thread = None

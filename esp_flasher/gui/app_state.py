@@ -15,11 +15,10 @@ class AppState:
         self.chip_port = ""
         self.mac_address = None
         self.device_name = ""
-        self.printer_port = ""
-        self.api_endpoint = ""
-        self.api_key = ""
-        self.api_secret = ""
         self.test_module = None
+
+        # ── Per-module storage (avoids hardcoding module fields) ──────
+        self.module_data = {}
 
         # ── UI references (set by MainWindow after widget creation) ───
         self.console = None  # QTextEdit widget

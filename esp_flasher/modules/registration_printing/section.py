@@ -150,7 +150,7 @@ class RegistrationPrintingSection(QGroupBox):
     # --- Backend handlers ---
 
     def _on_text_changed(self, text, field_name):
-        setattr(self.state, field_name, text)
+        self.state.module_data[field_name] = text
 
     # --- Printer handlers ---
 
@@ -163,7 +163,7 @@ class RegistrationPrintingSection(QGroupBox):
             self.printer_combobox.addItem("No printers found")
 
     def _select_printer(self, index):
-        self.state.printer_port = self.printer_combobox.itemText(index)
+        self.state.module_data["printer_port"] = self.printer_combobox.itemText(index)
 
     def test_print(self):
         printer_name = self.printer_combobox.currentText()
@@ -196,9 +196,9 @@ class RegistrationPrintingSection(QGroupBox):
         self.state.console.clear()
 
         if (
-            not self.state.api_endpoint
-            or not self.state.api_key
-            or not self.state.api_secret
+            not self.state.module_data.get("api_endpoint")
+            or not self.state.module_data.get("api_key")
+            or not self.state.module_data.get("api_secret")
         ):
             logging.error("API endpoint and/or credentials are missing!")
             return
@@ -209,9 +209,9 @@ class RegistrationPrintingSection(QGroupBox):
 
         self.state.console.clear()
         self.register_thread = RegisterThread(
-            self.state.api_endpoint,
-            self.state.api_key,
-            self.state.api_secret,
+            self.state.module_data.get("api_endpoint", ""),
+            self.state.module_data.get("api_key", ""),
+            self.state.module_data.get("api_secret", ""),
             self.state.mac_address,
         )
         self.register_thread.device_name_signal.connect(self._update_device_name)
@@ -224,7 +224,7 @@ class RegistrationPrintingSection(QGroupBox):
     def print_device(self):
         self.state.console.clear()
 
-        if not self.state.printer_port:
+        if not self.state.module_data.get("printer_port"):
             logging.error("No printer port selected!")
             return
 
@@ -239,7 +239,7 @@ class RegistrationPrintingSection(QGroupBox):
         font_size = self.font_size_spinbox.value()
 
         self.print_thread = PrintingThread(
-            self.state.printer_port,
+            self.state.module_data.get("printer_port", ""),
             self.state.device_name,
             label_width,
             x_offset,
