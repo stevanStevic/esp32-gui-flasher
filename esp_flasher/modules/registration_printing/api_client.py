@@ -23,7 +23,7 @@ def publish_mac_address(
 
             return (
                 None,
-                f"Unexpected status code: {response.status_code} {response.reason} - {response_data['message']}",
+                f"Unexpected status code: {response.status_code} {response.reason} - {response.text}",
             )
 
     except HTTPError as http_err:

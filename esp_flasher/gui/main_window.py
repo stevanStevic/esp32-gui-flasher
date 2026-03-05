@@ -39,7 +39,6 @@ def show_popup(title, message, icon, parent=None):
 class MainWindow(QMainWindow):
     def __init__(self, module_paths=None):
         super().__init__()
-        import sys
         import traceback
 
         def excepthook(type, value, tb):

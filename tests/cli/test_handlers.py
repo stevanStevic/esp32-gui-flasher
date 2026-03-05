@@ -11,13 +11,10 @@ from esp_flasher.helpers.utils import Esp_flasherError
 # ── handle_info ──────────────────────────────────────────────────────
 
 class TestHandleInfo:
-    @patch("esp_flasher.cli.handlers.read_chip_info")
-    @patch("esp_flasher.cli.handlers.detect_chip")
-    def test_returns_chip_info(self, mock_detect, mock_read):
+    @patch("esp_flasher.cli.handlers.get_chip_info")
+    def test_returns_chip_info(self, mock_get):
         from esp_flasher.cli.handlers import handle_info
 
-        mock_chip = MagicMock()
-        mock_detect.return_value = mock_chip
         mock_info = MagicMock()
         mock_info.family = "ESP32"
         mock_info.model = "ESP32-S3"
@@ -27,30 +24,23 @@ class TestHandleInfo:
         mock_info.has_bluetooth = True
         mock_info.has_embedded_flash = False
         mock_info.has_factory_calibrated_adc = True
-        mock_read.return_value = mock_info
+        mock_get.return_value = mock_info
 
         args = Namespace(port="/dev/ttyUSB0")
         result = handle_info(args)
 
-        mock_detect.assert_called_once_with("/dev/ttyUSB0")
-        mock_read.assert_called_once_with(mock_chip)
+        mock_get.assert_called_once_with("/dev/ttyUSB0")
         assert result is mock_info
-        mock_chip._port.close.assert_called_once()
 
-    @patch("esp_flasher.cli.handlers.read_chip_info")
-    @patch("esp_flasher.cli.handlers.detect_chip")
-    def test_closes_port_on_error(self, mock_detect, mock_read):
+    @patch("esp_flasher.cli.handlers.get_chip_info")
+    def test_propagates_error(self, mock_get):
         from esp_flasher.cli.handlers import handle_info
 
-        mock_chip = MagicMock()
-        mock_detect.return_value = mock_chip
-        mock_read.side_effect = RuntimeError("read failed")
+        mock_get.side_effect = RuntimeError("read failed")
 
         args = Namespace(port="/dev/ttyUSB0")
         with pytest.raises(RuntimeError, match="read failed"):
             handle_info(args)
-
-        mock_chip._port.close.assert_called_once()
 
 
 # ── handle_flash ─────────────────────────────────────────────────────
@@ -79,17 +69,15 @@ class TestHandleFlash:
 # ── handle_logs ──────────────────────────────────────────────────────
 
 class TestHandleLogs:
-    @patch("esp_flasher.cli.handlers.serial.Serial")
-    def test_reads_and_prints_logs(self, mock_serial_cls, capsys):
+    @patch("esp_flasher.cli.handlers.read_serial_lines")
+    def test_reads_and_prints_logs(self, mock_read_lines, capsys):
         from esp_flasher.cli.handlers import handle_logs
 
-        mock_port = MagicMock()
-        mock_serial_cls.return_value.__enter__ = MagicMock(return_value=mock_port)
-        mock_serial_cls.return_value.__exit__ = MagicMock(return_value=False)
+        def _lines(*a, **kw):
+            yield "Hello from ESP"
+            raise KeyboardInterrupt
 
-        # Simulate: first call has data, second raises KeyboardInterrupt
-        mock_port.in_waiting = 1
-        mock_port.readline.side_effect = [b"Hello from ESP\n", KeyboardInterrupt]
+        mock_read_lines.side_effect = _lines
 
         args = Namespace(port="/dev/ttyUSB0")
         handle_logs(args)
@@ -97,15 +85,11 @@ class TestHandleLogs:
         captured = capsys.readouterr()
         assert "Hello from ESP" in captured.out
 
-    @patch("esp_flasher.cli.handlers.serial.Serial")
-    def test_serial_error_raises(self, mock_serial_cls):
+    @patch("esp_flasher.cli.handlers.read_serial_lines")
+    def test_serial_error_raises(self, mock_read_lines):
         from esp_flasher.cli.handlers import handle_logs
-        import serial
 
-        mock_serial_cls.return_value.__enter__ = MagicMock(
-            side_effect=serial.SerialException("port busy")
-        )
-        mock_serial_cls.return_value.__exit__ = MagicMock(return_value=False)
+        mock_read_lines.side_effect = Esp_flasherError("Serial error: port busy")
 
         args = Namespace(port="/dev/ttyUSB0")
         with pytest.raises(Esp_flasherError, match="Serial error"):
@@ -115,16 +99,12 @@ class TestHandleLogs:
 # ── handle_test ──────────────────────────────────────────────────────
 
 class TestHandleTest:
-    @patch("esp_flasher.cli.handlers.serial.Serial")
+    @patch("esp_flasher.cli.handlers.read_serial_lines")
     @patch("esp_flasher.cli.handlers.run_esp_flasher")
-    def test_pass_on_regex_match(self, mock_flash, mock_serial_cls):
+    def test_pass_on_regex_match(self, mock_flash, mock_read_lines):
         from esp_flasher.cli.handlers import handle_test
 
-        mock_port = MagicMock()
-        mock_serial_cls.return_value.__enter__ = MagicMock(return_value=mock_port)
-        mock_serial_cls.return_value.__exit__ = MagicMock(return_value=False)
-        mock_port.in_waiting = 1
-        mock_port.readline.return_value = b"BOOT_OK: system ready\n"
+        mock_read_lines.return_value = iter(["BOOT_OK: system ready"])
 
         args = Namespace(
             port="/dev/ttyUSB0",
@@ -138,20 +118,13 @@ class TestHandleTest:
         assert result is True
         mock_flash.assert_called_once_with("/dev/ttyUSB0", "fw.zip", baud_rate=460800)
 
-    @patch("esp_flasher.cli.handlers.time")
-    @patch("esp_flasher.cli.handlers.serial.Serial")
+    @patch("esp_flasher.cli.handlers.read_serial_lines")
     @patch("esp_flasher.cli.handlers.run_esp_flasher")
-    def test_fail_on_timeout(self, mock_flash, mock_serial_cls, mock_time):
+    def test_fail_on_timeout(self, mock_flash, mock_read_lines):
         from esp_flasher.cli.handlers import handle_test
 
-        mock_port = MagicMock()
-        mock_serial_cls.return_value.__enter__ = MagicMock(return_value=mock_port)
-        mock_serial_cls.return_value.__exit__ = MagicMock(return_value=False)
-        mock_port.in_waiting = 0
-
-        # Simulate: first time() call for deadline, then time() > deadline
-        mock_time.time.side_effect = [100.0, 200.0]
-        mock_time.sleep = MagicMock()
+        # Empty iterator — no lines to read
+        mock_read_lines.return_value = iter([])
 
         args = Namespace(
             port="/dev/ttyUSB0",
@@ -165,9 +138,8 @@ class TestHandleTest:
         assert result is False
         mock_flash.assert_called_once()
 
-    @patch("esp_flasher.cli.handlers.serial.Serial")
     @patch("esp_flasher.cli.handlers.run_esp_flasher")
-    def test_flash_error_propagates(self, mock_flash, mock_serial_cls):
+    def test_flash_error_propagates(self, mock_flash):
         from esp_flasher.cli.handlers import handle_test
 
         mock_flash.side_effect = Esp_flasherError("flash failed")

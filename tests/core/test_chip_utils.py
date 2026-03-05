@@ -1,6 +1,4 @@
 """Tests for esp_flasher.core.chip_utils module."""
-import io
-import struct
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -13,10 +11,8 @@ from esp_flasher.core.chip_utils import (
     read_chip_info,
     read_chip_property,
     chip_run_stub,
-    detect_flash_size,
-    read_firmware_info,
-    format_bootloader_path,
     detect_chip,
+    get_chip_info,
 )
 from esp_flasher.helpers.utils import Esp_flasherError
 
@@ -225,82 +221,33 @@ class TestChipRunStub:
             chip_run_stub(mock_chip)
 
 
-class TestDetectFlashSize:
-    """Tests for detect_flash_size function."""
+class TestGetChipInfo:
+    """Tests for get_chip_info convenience function."""
 
-    @patch("esp_flasher.core.chip_utils.read_chip_property")
-    @patch("esp_flasher.core.chip_utils.esptool")
-    def test_known_size(self, mock_esptool, mock_read_prop):
-        """Known flash ID returns correct size from DETECTED_FLASH_SIZES."""
-        mock_esptool.DETECTED_FLASH_SIZES = {0x40: "8MB", 0x20: "4MB"}
-        mock_read_prop.return_value = 0x00400000  # flash_id >> 16 = 0x40
+    @patch("esp_flasher.core.chip_utils.read_chip_info")
+    @patch("esp_flasher.core.chip_utils.detect_chip")
+    def test_returns_info_and_closes_port(self, mock_detect, mock_read):
+        mock_chip = MagicMock()
+        mock_detect.return_value = mock_chip
+        mock_info = MagicMock()
+        mock_read.return_value = mock_info
 
-        mock_stub = MagicMock()
-        result = detect_flash_size(mock_stub)
-        assert result == "8MB"
+        result = get_chip_info("/dev/ttyUSB0")
 
-    @patch("esp_flasher.core.chip_utils.read_chip_property")
-    @patch("esp_flasher.core.chip_utils.esptool")
-    def test_unknown_size_defaults_4mb(self, mock_esptool, mock_read_prop):
-        """Unknown flash ID should default to 4MB."""
-        mock_esptool.DETECTED_FLASH_SIZES = {}
-        mock_read_prop.return_value = 0x00FF0000
+        assert result is mock_info
+        mock_detect.assert_called_once_with("/dev/ttyUSB0")
+        mock_read.assert_called_once_with(mock_chip)
+        mock_chip._port.close.assert_called_once()
 
-        result = detect_flash_size(MagicMock())
-        assert result == "4MB"
+    @patch("esp_flasher.core.chip_utils.read_chip_info")
+    @patch("esp_flasher.core.chip_utils.detect_chip")
+    def test_closes_port_on_error(self, mock_detect, mock_read):
+        mock_chip = MagicMock()
+        mock_detect.return_value = mock_chip
+        mock_read.side_effect = RuntimeError("read failed")
 
+        with pytest.raises(RuntimeError, match="read failed"):
+            get_chip_info("/dev/ttyUSB0")
 
-class TestReadFirmwareInfo:
-    """Tests for read_firmware_info function."""
+        mock_chip._port.close.assert_called_once()
 
-    @patch("esp_flasher.core.chip_utils.esptool")
-    def test_valid_firmware(self, mock_esptool):
-        """Valid firmware header returns (flash_mode, flash_freq)."""
-        mock_esptool.ESPLoader.ESP_IMAGE_MAGIC = 0xE9
-
-        # Header: magic=0xE9, segment_count=0x01, flash_mode=2 (dio), flash_size_freq=0x0F (80m)
-        header = struct.pack("BBBB", 0xE9, 0x01, 0x02, 0x0F)
-        firmware = io.BytesIO(header)
-
-        mode, freq = read_firmware_info(firmware)
-        assert mode == "dio"
-        assert freq == "80m"
-        # Verify seek(0) was called — file position should be at start
-        assert firmware.tell() == 0
-
-    @patch("esp_flasher.core.chip_utils.esptool")
-    def test_invalid_magic(self, mock_esptool):
-        """Invalid magic byte raises Esp_flasherError."""
-        mock_esptool.ESPLoader.ESP_IMAGE_MAGIC = 0xE9
-
-        header = struct.pack("BBBB", 0xFF, 0x00, 0x00, 0x00)
-        firmware = io.BytesIO(header)
-
-        with pytest.raises(Esp_flasherError, match="firmware binary is invalid"):
-            read_firmware_info(firmware)
-
-    @patch("esp_flasher.core.chip_utils.esptool")
-    def test_qio_40m(self, mock_esptool):
-        """flash_mode=0 (qio), flash_freq=0 (40m)."""
-        mock_esptool.ESPLoader.ESP_IMAGE_MAGIC = 0xE9
-
-        header = struct.pack("BBBB", 0xE9, 0x01, 0x00, 0x00)
-        firmware = io.BytesIO(header)
-
-        mode, freq = read_firmware_info(firmware)
-        assert mode == "qio"
-        assert freq == "40m"
-
-
-class TestFormatBootloaderPath:
-    """Tests for format_bootloader_path function."""
-
-    def test_replacement(self):
-        result = format_bootloader_path(
-            "bootloader_$FLASH_MODE$_$FLASH_FREQ$.bin", "dio", "80m"
-        )
-        assert result == "bootloader_dio_80m.bin"
-
-    def test_no_placeholders(self):
-        result = format_bootloader_path("bootloader.bin", "dio", "80m")
-        assert result == "bootloader.bin"

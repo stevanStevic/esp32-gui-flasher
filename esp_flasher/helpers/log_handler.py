@@ -79,11 +79,6 @@ class FlashLogHandler(logging.Handler, QObject):
         text = self.ANSI_COLOR_PATTERN.sub("", text)
         return text, color
 
-    def _get_color_from_level_or_default(self, text):
-        # fallback for non-ANSI: use log level if possible, else white
-        # This method can be improved to extract level from text if needed
-        return "white"
-
     def _get_color(self, levelno):
         if levelno >= logging.ERROR:
             return "red"

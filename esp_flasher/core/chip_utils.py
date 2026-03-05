@@ -1,4 +1,3 @@
-import struct
 import esptool
 
 from esp_flasher.helpers.utils import prevent_print, Esp_flasherError
@@ -129,30 +128,6 @@ def chip_run_stub(chip):
         raise Esp_flasherError(f"Error putting ESP in stub flash mode: {err}") from err
 
 
-def detect_flash_size(stub_chip):
-    flash_id = read_chip_property(stub_chip.flash_id)
-    return esptool.DETECTED_FLASH_SIZES.get(flash_id >> 16, "4MB")
-
-
-def read_firmware_info(firmware):
-    header = firmware.read(4)
-    firmware.seek(0)
-
-    magic, _, flash_mode_raw, flash_size_freq = struct.unpack("BBBB", header)
-    if magic != esptool.ESPLoader.ESP_IMAGE_MAGIC:
-        raise Esp_flasherError(
-            f"The firmware binary is invalid (magic byte={magic:02X}, should be {esptool.ESPLoader.ESP_IMAGE_MAGIC:02X})"
-        )
-    flash_freq_raw = flash_size_freq & 0x0F
-    flash_mode = {0: "qio", 1: "qout", 2: "dio", 3: "dout"}.get(flash_mode_raw)
-    flash_freq = {0: "40m", 1: "26m", 2: "20m", 0xF: "80m"}.get(flash_freq_raw)
-    return flash_mode, flash_freq
-
-
-def format_bootloader_path(path, flash_mode, flash_freq):
-    return path.replace("$FLASH_MODE$", flash_mode).replace("$FLASH_FREQ$", flash_freq)
-
-
 def detect_chip(port, baud=115200):
     """Detect ESP chip type."""
     try:
@@ -162,3 +137,19 @@ def detect_chip(port, baud=115200):
         return chip
     except esptool.FatalError as err:
         raise Esp_flasherError(f"ESP Chip Auto-Detection failed: {err}") from err
+
+
+def get_chip_info(port):
+    """Detect the chip, read its info, and close the port.
+
+    Returns:
+        A ChipInfo (or subclass) instance.
+
+    Raises:
+        Esp_flasherError: on detection or communication failure.
+    """
+    chip = detect_chip(port)
+    try:
+        return read_chip_info(chip)
+    finally:
+        chip._port.close()

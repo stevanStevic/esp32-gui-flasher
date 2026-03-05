@@ -1,6 +1,5 @@
 import logging
 from PyQt5.QtWidgets import QGroupBox, QHBoxLayout, QPushButton
-from PyQt5.QtCore import pyqtSignal, QThread
 from esp_flasher.threads.chip_info_thread import ChipInfoThread
 
 

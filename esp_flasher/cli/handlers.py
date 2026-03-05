@@ -8,39 +8,34 @@ layer — they contain no GUI or threading logic.
 import re
 import time
 
-import serial
-
-from esp_flasher.core.chip_utils import detect_chip, read_chip_info
+from esp_flasher.core.chip_utils import get_chip_info
 from esp_flasher.core.flasher import run_esp_flasher
 from esp_flasher.helpers.utils import Esp_flasherError
+from esp_flasher.helpers.serial_utils import read_serial_lines
 
 
 # ── info ─────────────────────────────────────────────────────────────
 
 def handle_info(args):
     """Read and display chip information."""
-    chip = detect_chip(args.port)
-    try:
-        info = read_chip_info(chip)
+    info = get_chip_info(args.port)
 
-        print("Chip Information:")
-        print(f"  Chip Family : {info.family}")
-        print(f"  Model       : {info.model}")
-        print(f"  MAC Address : {info.mac}")
+    print("Chip Information:")
+    print(f"  Chip Family : {info.family}")
+    print(f"  Model       : {info.model}")
+    print(f"  MAC Address : {info.mac}")
 
-        if hasattr(info, "num_cores"):
-            print(f"  Cores       : {info.num_cores}")
-            print(f"  CPU Freq    : {info.cpu_frequency}")
-            print(f"  Bluetooth   : {'YES' if info.has_bluetooth else 'NO'}")
-            print(f"  Embed Flash : {'YES' if info.has_embedded_flash else 'NO'}")
-            print(
-                f"  Calibr. ADC : "
-                f"{'YES' if info.has_factory_calibrated_adc else 'NO'}"
-            )
+    if hasattr(info, "num_cores"):
+        print(f"  Cores       : {info.num_cores}")
+        print(f"  CPU Freq    : {info.cpu_frequency}")
+        print(f"  Bluetooth   : {'YES' if info.has_bluetooth else 'NO'}")
+        print(f"  Embed Flash : {'YES' if info.has_embedded_flash else 'NO'}")
+        print(
+            f"  Calibr. ADC : "
+            f"{'YES' if info.has_factory_calibrated_adc else 'NO'}"
+        )
 
-        return info
-    finally:
-        chip._port.close()
+    return info
 
 
 # ── flash ────────────────────────────────────────────────────────────
@@ -57,21 +52,10 @@ def handle_logs(args):
     """Stream device logs until interrupted with Ctrl+C."""
     print(f"Streaming logs from {args.port}  (Ctrl+C to stop) …")
     try:
-        with serial.Serial(args.port, baudrate=115200, timeout=1) as ser:
-            ser.setDTR(False)
-            ser.setRTS(False)
-            time.sleep(0.1)
-
-            while True:
-                if ser.in_waiting > 0:
-                    raw = ser.readline()
-                    text = raw.decode(errors="ignore").strip()
-                    if text:
-                        print(text)
+        for line in read_serial_lines(args.port):
+            print(line)
     except KeyboardInterrupt:
         print("\nLog streaming stopped.")
-    except serial.SerialException as exc:
-        raise Esp_flasherError(f"Serial error: {exc}") from exc
 
 
 # ── test ─────────────────────────────────────────────────────────────
@@ -96,23 +80,13 @@ def handle_test(args):
         f"(timeout {args.timeout}s) …"
     )
 
-    try:
-        with serial.Serial(args.port, baudrate=115200, timeout=1) as ser:
-            ser.setDTR(False)
-            ser.setRTS(False)
-            time.sleep(0.1)
-
-            while time.time() < deadline:
-                if ser.in_waiting > 0:
-                    raw = ser.readline()
-                    text = raw.decode(errors="ignore").strip()
-                    if text:
-                        print(text)
-                    if pattern.search(text):
-                        print("\n✅ PASS — pattern matched.")
-                        return True
-    except serial.SerialException as exc:
-        raise Esp_flasherError(f"Serial error: {exc}") from exc
+    for line in read_serial_lines(args.port):
+        if time.time() >= deadline:
+            break
+        print(line)
+        if pattern.search(line):
+            print("\n✅ PASS — pattern matched.")
+            return True
 
     print("\n❌ FAIL — timeout expired without a match.")
     return False

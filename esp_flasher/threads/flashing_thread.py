@@ -4,8 +4,6 @@ from esp_flasher.core.flasher import run_esp_flasher
 
 
 class FlashingThread(QThread):
-    success_signal = pyqtSignal(str)
-    error_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(bool)  # Signal to indicate success
 
     def __init__(self, firmware, port):

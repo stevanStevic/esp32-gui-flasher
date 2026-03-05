@@ -55,13 +55,9 @@ def prevent_print(func, *args, **kwargs):
     try:
         return func(*args, **kwargs)
     except serial.SerialException as err:
-        from esp_flasher.core.chip_utils import EspflasherError
-
-        raise EspflasherError("Serial port closed: {}".format(err))
+        raise Esp_flasherError("Serial port closed: {}".format(err)) from err
     finally:
         sys.stdout = orig_sys_stdout
-        sys.stdout.isatty = lambda: False
-        pass
 
 
 def load_config(path=CONFIG_PATH):
@@ -91,13 +87,17 @@ def get_device_dir(device_name=None, mac_address=None):
     return device_dir
 
 
+def get_log_path(device_dir, prefix):
+    """Generate a unique log file path with the given prefix."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return os.path.join(device_dir, f"{prefix}_{timestamp}.log")
+
+
 def get_flash_log_path(device_dir):
     """Generate a unique log file path for flashing."""
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    return os.path.join(device_dir, f"flashing_{timestamp}.log")
+    return get_log_path(device_dir, "flashing")
 
 
 def get_testing_log_path(device_dir):
     """Generate a unique log file path for testing."""
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    return os.path.join(device_dir, f"testing_{timestamp}.log")
+    return get_log_path(device_dir, "testing")

@@ -1,7 +1,8 @@
 from PyQt5.QtCore import QThread, pyqtSignal
-import serial
-import time
 import logging
+
+from esp_flasher.helpers.serial_utils import read_serial_lines
+from esp_flasher.helpers.utils import Esp_flasherError
 
 
 class LogThread(QThread):
@@ -19,21 +20,15 @@ class LogThread(QThread):
         self._running = True
 
         try:
-            with serial.Serial(self._port, baudrate=115200, timeout=1) as serial_port:
-                # Prevent ESP32 from staying in bootloader mode
-                serial_port.setDTR(False)
-                serial_port.setRTS(False)
-                time.sleep(0.1)  # Give it a moment to settle
-
-                while self._running:
-                    if serial_port.in_waiting > 0:
-                        raw = serial_port.readline()
-                        text = raw.decode(errors="ignore").strip()
-                        logging.info(text)
-
-                        self.log_signal.emit(text)  # Emit log line for test controller
-        except serial.SerialException as e:
-            self.error_signal.emit(f"Serial Error: {str(e)}")
+            for line in read_serial_lines(
+                self._port, should_stop=lambda: not self._running
+            ):
+                if not self._running:
+                    break
+                logging.info(line)
+                self.log_signal.emit(line)
+        except Esp_flasherError as e:
+            self.error_signal.emit(str(e))
         except Exception as e:
             self.error_signal.emit(f"Log Error: {str(e)}")
 

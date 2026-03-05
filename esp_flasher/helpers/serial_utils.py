@@ -1,26 +1,48 @@
-from esp_flasher.helpers.utils import Esp_flasherError
+import time
+
+import serial
 import esptool
+
+from esp_flasher.helpers.utils import Esp_flasherError
 
 
 def list_serial_ports():
     return esptool.get_port_list()
 
 
-def select_port(args):
-    if args.port:
-        print(f"Using '{args.port}' as serial port.")
-        return args.port
+def read_serial_lines(port, baudrate=115200, timeout=1, should_stop=None):
+    """Open a serial port and yield decoded, stripped lines.
 
-    ports = list_serial_ports()
-    if not ports:
-        raise Esp_flasherError("No serial port found!")
+    Configures DTR/RTS for ESP chips and yields non-empty lines
+    until the caller stops iterating (e.g. via ``break``) or
+    *should_stop* returns ``True``.
 
-    if len(ports) == 1:
-        print(f"Auto-detected serial port: {ports[0][0]}")
-        return ports[0][0]
+    Args:
+        port: Serial port path.
+        baudrate: Baud rate (default 115200).
+        timeout: Read timeout in seconds (default 1).
+        should_stop: Optional callable returning ``True`` to signal
+            the generator to exit.  Checked every loop iteration so
+            the caller can stop even when no data arrives.
 
-    print("Found multiple serial ports:")
-    for port, desc in ports:
-        print(f" * {port} ({desc})")
-    print("Please specify one using the --port argument.")
-    raise Esp_flasherError()
+    Raises:
+        Esp_flasherError: on serial communication failure.
+    """
+    try:
+        with serial.Serial(port, baudrate=baudrate, timeout=timeout) as ser:
+            ser.setDTR(False)
+            ser.setRTS(False)
+            time.sleep(0.1)
+
+            while True:
+                if should_stop is not None and should_stop():
+                    break
+                if ser.in_waiting > 0:
+                    raw = ser.readline()
+                    text = raw.decode(errors="ignore").strip()
+                    if text:
+                        yield text
+                else:
+                    time.sleep(0.01)  # avoid busy-wait when idle
+    except serial.SerialException as exc:
+        raise Esp_flasherError(f"Serial error: {exc}") from exc
