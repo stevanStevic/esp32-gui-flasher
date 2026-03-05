@@ -1,5 +1,9 @@
-import win32ui
-import win32con
+import platform
+
+if platform.system() == "Windows":
+    import win32ui
+    import win32con
+
 from esp_flasher.modules.registration_printing.printers.base_printer import BasePrinter
 
 
@@ -7,6 +11,8 @@ class WindowsPrinter(BasePrinter):
     """Printer implementation for Windows with configurable label settings."""
 
     def __init__(self, printer_name):
+        if platform.system() != "Windows":
+            raise RuntimeError("WindowsPrinter is only supported on Windows")
         self.printer_name = printer_name
         self.font_weight = win32con.FW_NORMAL  # Font weight (e.g., normal, bold)
 
