@@ -8,11 +8,18 @@ Non-essential options are hidden, making the process accessible for beginners wh
 - [ESP32 GUI Flasher – Easy Firmware Flashing with Label Printing](#esp32-gui-flasher--easy-firmware-flashing-with-label-printing)
   - [Overview](#overview)
     - [Why use ESP32 GUI Flasher?](#why-use-esp32-gui-flasher)
+  - [Architecture](#architecture)
   - [Features](#features)
   - [Installation and Setup](#installation-and-setup)
     - [Using the Pre-Built Binary (Windows)](#using-the-pre-built-binary-windows)
     - [Running from Source (All Platforms)](#running-from-source-all-platforms)
     - [Building a Standalone Executable (Not fully tested for Linux and MacOS)](#building-a-standalone-executable-not-fully-tested-for-linux-and-macos)
+  - [CLI Usage](#cli-usage)
+    - [Global Options](#global-options)
+    - [info — Read Chip Information](#info--read-chip-information)
+    - [flash — Flash Firmware](#flash--flash-firmware)
+    - [logs — Stream Device Logs](#logs--stream-device-logs)
+    - [test — Flash & Run Log-Based Test](#test--flash--run-log-based-test)
   - [Printer Integration (Brother QL-600)](#printer-integration-brother-ql-600)
     - [Supported Printer](#supported-printer)
     - [Windows Driver Setup](#windows-driver-setup)
@@ -29,6 +36,12 @@ Non-essential options are hidden, making the process accessible for beginners wh
   - [Automated Testing and Log File Management](#automated-testing-and-log-file-management)
     - [Automated Device Testing](#automated-device-testing)
     - [Log File Handling During Testing](#log-file-handling-during-testing)
+  - [Extending with GUI Modules](#extending-with-gui-modules)
+    - [What is a GUI Module?](#what-is-a-gui-module)
+    - [Creating a Minimal Module](#creating-a-minimal-module)
+    - [GUIModule API Reference](#guimodule-api-reference)
+    - [Loading Your Module](#loading-your-module)
+    - [Reference Implementation](#reference-implementation)
   - [Configuration and Options](#configuration-and-options)
     - [Configuration File (`config.json`)](#configuration-file-configjson)
     - [Secure vs. Regular Firmware Flashing](#secure-vs-regular-firmware-flashing)
@@ -53,6 +66,19 @@ ESP32 GUI Flasher is designed to make firmware updates for ESP32-based hardware 
 * **Console Logging:** The tool displays flash progress and logs in a text console area so you can monitor the process in real-time.
 * **Device Info & Registration:** It can retrieve the device’s chip info (like MAC address) and, if configured, register the device with a backend service using a provided API. This is useful for assigning or recording device IDs in an IoT deployment.
 * **Label Printing:** Optionally connect a Brother QL-600 label printer to print a label for each device immediately after flashing, containing info like the device name or ID. This helps with physical labeling of devices. The printer integration is optional – the flasher works fine without a printer connected.
+
+## <a name="architecture"></a>Architecture
+
+The application is split into a **CLI layer** (headless, scriptable) and a **GUI layer** (interactive, PyQt5-based). Both share the same **core** library for chip detection, flashing, and serial I/O.
+
+![Architecture Diagram](images/architecture.png)
+
+**Key design points:**
+
+* **CLI handlers** (`cli/handlers.py`) are thin wrappers — they call the core library directly, contain no UI or threading logic, and return simple values.
+* **GUI sections** each own a `QGroupBox` and communicate through a shared `AppState` object (never reaching into `MainWindow` internals).
+* **GUI Modules** are loaded dynamically at startup via `--load-module`. They receive the `AppState` and insert their own `QGroupBox` between the Chip Info and Firmware sections.
+* **Background threads** (`gui/threads/`) keep the UI responsive — flashing, chip detection, log streaming, and testing each run in dedicated `QThread` subclasses.
 
 ## <a name="features"></a>Features
 
@@ -139,6 +165,184 @@ If you want to build a one-file executable from the source (for distribution or 
 While not explicitly documented, you can attempt to use PyInstaller on macOS as well. The process would be similar to Linux. Note that PyInstaller on macOS will create an `.app` bundle or executable. You may need to provide a `.icns` icon (or use `icon.png` as a generic icon). macOS support for PyInstaller exists, but printing functionality in this tool is not natively supported on Mac (see [Known Issues and Limitations](#known-issues-and-limitations)). For flashing functionality, the built app should work.
 
 After building, you can distribute the resulting binary. Remember that on Linux/macOS, the user may need to mark the file as executable (`chmod +x ESP32-Flasher`) before running it.
+
+## <a name="cli-usage"></a>CLI Usage
+
+The tool provides a full CLI for headless / CI / scripted workflows. All commands are accessed via:
+
+```bash
+python -m esp_flasher <command> [options]
+```
+
+Run `python -m esp_flasher --help` for a summary of all commands.
+
+### <a name="global-options"></a>Global Options
+
+| Flag | Description |
+|---|---|
+| `--gui` | Launch the graphical interface. All subcommands are ignored when this is set. |
+| `--load-module PATH` | (GUI only) Path to a GUIModule plugin file or package. May be repeated. |
+
+**Example — launch the GUI with an extension module:**
+
+```bash
+python -m esp_flasher --gui --load-module esp_flasher/modules/registration_printing
+```
+
+---
+
+### <a name="info--read-chip-information"></a>`info` — Read Chip Information
+
+Connects to the ESP chip and prints identification data (family, model, MAC address, core count, etc.).
+
+```bash
+python -m esp_flasher info -p <PORT>
+```
+
+**Example:**
+
+```bash
+# Linux
+python -m esp_flasher info -p /dev/ttyUSB0
+
+# Windows
+python -m esp_flasher info -p COM3
+```
+
+**Sample output:**
+
+```
+Chip Information:
+  Chip Family : ESP32
+  Model       : ESP32-D0WDQ6 (revision 1)
+  MAC Address : DC:B4:D9:0A:C2:E8
+  Cores       : 2
+  CPU Freq    : 240MHz
+  Bluetooth   : YES
+  Embed Flash : NO
+  Calibr. ADC : NO
+```
+
+---
+
+### <a name="flash--flash-firmware"></a>`flash` — Flash Firmware
+
+Writes a firmware release ZIP (containing `flasher_args.json` + binaries) onto the chip.
+
+```bash
+python -m esp_flasher flash -p <PORT> --firmware <ZIP_PATH> [--baud <RATE>]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `-p, --port` | *(required)* | Serial port |
+| `--firmware` | *(required)* | Path to the firmware `.zip` file |
+| `--baud` | `460800` | Upload baud rate |
+
+**Examples:**
+
+```bash
+# Flash with default baud rate
+python -m esp_flasher flash -p /dev/ttyUSB0 --firmware release_v2.1.0.zip
+
+# Flash with a slower baud rate (useful for long USB cables)
+python -m esp_flasher flash -p /dev/ttyUSB0 --firmware release_v2.1.0.zip --baud 115200
+
+# Windows
+python -m esp_flasher flash -p COM3 --firmware C:\firmware\release_v2.1.0.zip
+```
+
+On success the output ends with:
+
+```
+Flashing completed successfully.
+```
+
+---
+
+### <a name="logs--stream-device-logs"></a>`logs` — Stream Device Logs
+
+Opens the serial port and prints every line the device sends. Blocks until you press **Ctrl+C**.
+
+```bash
+python -m esp_flasher logs -p <PORT>
+```
+
+**Example:**
+
+```bash
+python -m esp_flasher logs -p /dev/ttyUSB0
+```
+
+```
+Streaming logs from /dev/ttyUSB0  (Ctrl+C to stop) …
+I (234) cpu_start: Starting app cpu, entry point is 0x40081234
+I (236) heap_init: Initializing. RAM available for dynamic allocation:
+…
+^C
+Log streaming stopped.
+```
+
+---
+
+### <a name="test--flash--run-log-based-test"></a>`test` — Flash & Run Log-Based Test
+
+A combined command that **flashes** the firmware and then **watches the serial output** for a regex pattern within a timeout. Useful in CI pipelines and production-line testing.
+
+```bash
+python -m esp_flasher test -p <PORT> --firmware <ZIP> --regex <PATTERN> --timeout <SECONDS> [--baud <RATE>]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `-p, --port` | *(required)* | Serial port |
+| `--firmware` | *(required)* | Path to the firmware `.zip` file |
+| `--regex` | *(required)* | Python regex pattern to search for in device logs |
+| `--timeout` | *(required)* | Seconds to wait for a match before declaring failure |
+| `--baud` | `460800` | Upload baud rate |
+
+**Examples:**
+
+```bash
+# Flash and wait up to 30 s for the device to print "Wi-Fi connected"
+python -m esp_flasher test \
+    -p /dev/ttyUSB0 \
+    --firmware release_v2.1.0.zip \
+    --regex "Wi-Fi connected" \
+    --timeout 30
+
+# Use a regex with alternation
+python -m esp_flasher test \
+    -p /dev/ttyUSB0 \
+    --firmware release_v2.1.0.zip \
+    --regex "PASS|ALL TESTS OK" \
+    --timeout 60
+```
+
+**Pass output:**
+
+```
+Step 1/2: Flashing firmware …
+Flashing completed successfully.
+Step 2/2: Watching logs for /Wi-Fi connected/ (timeout 30s) …
+I (1023) wifi: connected to AP
+I (1045) main: Wi-Fi connected
+
+✅ PASS — pattern matched.
+```
+
+**Fail output (timeout):**
+
+```
+Step 1/2: Flashing firmware …
+Flashing completed successfully.
+Step 2/2: Watching logs for /Wi-Fi connected/ (timeout 5s) …
+I (1023) wifi: scanning...
+
+❌ FAIL — timeout expired without a match.
+```
+
+The process exits with code **0** on pass and **1** on failure, making it easy to integrate with CI systems.
 
 ## <a name="printer-integration-brother-ql-600"></a>Printer Integration (Brother QL-600)
 
@@ -332,6 +536,140 @@ User flashes device; a `flashing_<timestamp>.log` file is created.
   - The log file is opened and set as the active log destination at the start of testing.
   - All log output during the test is written to this file.
   - When the test ends, the log file is closed and logging returns to its default state.
+
+## <a name="extending-with-gui-modules"></a>Extending with GUI Modules
+
+The GUI supports a plug-in system that lets you add custom sections to the main window without modifying the core codebase.
+
+### <a name="what-is-a-gui-module"></a>What is a GUI Module?
+
+A GUI Module is a Python class that inherits from `esp_flasher.gui.module_base.GUIModule`. It provides a `QGroupBox` widget that the main window inserts between the **Chip Info** and **Firmware** sections. Modules receive the shared `AppState` object, giving them access to the current MAC address, serial port, firmware path, console widget, and popup callbacks.
+
+### <a name="creating-a-minimal-module"></a>Creating a Minimal Module
+
+Create a single `.py` file anywhere on your system (e.g. `my_module.py`):
+
+```python
+from esp_flasher.gui.module_base import GUIModule
+from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QLabel, QPushButton
+
+
+class HelloModule(GUIModule):
+    """A minimal example module."""
+
+    def get_name(self) -> str:
+        return "Hello Module"
+
+    def create_section(self, state) -> QGroupBox:
+        box = QGroupBox("Hello")
+        layout = QVBoxLayout()
+
+        label = QLabel("Hello from a custom module!")
+        layout.addWidget(label)
+
+        # Example: use AppState to show the current MAC address
+        btn = QPushButton("Show MAC")
+        btn.clicked.connect(
+            lambda: state.show_success_popup(
+                f"MAC: {state.mac_address or 'N/A'}"
+            )
+        )
+        layout.addWidget(btn)
+
+        box.setLayout(layout)
+        return box
+```
+
+Launch with:
+
+```bash
+python -m esp_flasher --gui --load-module /path/to/my_module.py
+```
+
+The module's section will appear in the left panel between Chip Info and Firmware.
+
+### <a name="guimodule-api-reference"></a>GUIModule API Reference
+
+| Method | Required | Description |
+|---|---|---|
+| `get_name() -> str` | **Yes** | Human-readable name (used in log messages). |
+| `create_section(state) -> QGroupBox` | **Yes** | Build and return the widget for your module. `state` is an `AppState` instance. |
+| `apply_config(config: dict) -> None` | No | Called after `create_section()` with the loaded `config.json` dict. Use this to restore saved settings. |
+| `dispose() -> None` | No | Cleanup hook called when the main window closes. Stop threads, release resources, or persist state here. |
+
+**`AppState` fields available to modules:**
+
+| Field | Type | Description |
+|---|---|---|
+| `state.firmware` | `str` | Currently selected firmware path. |
+| `state.chip_port` | `str` | Currently selected serial port. |
+| `state.mac_address` | `str \| None` | MAC address of the connected chip (after Get Device Info). |
+| `state.device_name` | `str` | Device name (after registration). |
+| `state.test_module` | `DeviceTestModule` | Testing configuration model. |
+| `state.module_data` | `dict` | Generic dict for modules to store per-module data without coupling. |
+| `state.console` | `QTextEdit` | The console output widget. |
+| `state.show_error_popup(msg)` | callback | Display an error dialog. |
+| `state.show_success_popup(msg)` | callback | Display a success dialog. |
+| `state.set_log_file(path)` | callback | Redirect log output to a file. |
+| `state.close_log_file()` | callback | Stop file logging. |
+
+### <a name="loading-your-module"></a>Loading Your Module
+
+Modules can be a single `.py` file **or** a Python package directory (a folder with `__init__.py`). Use `--load-module` one or more times:
+
+```bash
+# Single file
+python -m esp_flasher --gui --load-module /path/to/my_module.py
+
+# Package directory
+python -m esp_flasher --gui --load-module /path/to/my_package/
+
+# Multiple modules
+python -m esp_flasher --gui \
+    --load-module ./modules/module_a.py \
+    --load-module ./modules/module_b/
+```
+
+The loader will:
+1. Resolve the path to a `.py` file (or the `__init__.py` inside a package).
+2. Import it dynamically.
+3. Find the first concrete `GUIModule` subclass.
+4. Instantiate it and add its section to the main window.
+
+### <a name="reference-implementation"></a>Reference Implementation
+
+The built-in **Device Registration and Printing** module is a full-featured example you can study and use as a template. It lives at:
+
+```
+esp_flasher/modules/registration_printing/
+├── __init__.py          # GUIModule subclass (RegistrationPrintingModule)
+├── section.py           # QGroupBox with backend + printer UI
+├── api_client.py        # REST API integration
+├── printer_utils.py     # Printer discovery helpers
+├── printer.py           # Print-job logic
+├── printers/            # Printer backends (Brother, Win)
+│   ├── base_printer.py
+│   ├── brother_printer.py
+│   └── win_printer.py
+└── threads/             # Background threads
+    ├── printing_thread.py
+    └── register_thread.py
+```
+
+This module demonstrates:
+
+* **`get_name()`** — returns `"Device Registration and Printing"`.
+* **`create_section(state)`** — builds a complex section with API fields, printer selection, spin-boxes, and action buttons.
+* **`apply_config(config)`** — restores printer settings and API credentials from `config.json`.
+* **`dispose()`** — gracefully stops running threads on window close.
+* **Background threads** — `RegisterThread` calls an external API; `PrintingThread` sends a label to the printer. Both communicate results back to the UI via Qt signals.
+* **Using `AppState`** — reads `state.mac_address` and `state.chip_port`; writes to `state.device_name` and `state.module_data`.
+
+Load it with:
+
+```bash
+python -m esp_flasher --gui --load-module esp_flasher/modules/registration_printing
+```
 
 ## <a name="configuration-and-options"></a>Configuration and Options
 
