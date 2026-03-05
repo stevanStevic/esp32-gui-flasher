@@ -1,7 +1,7 @@
 import logging
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from esp_flasher.core.chip_utils import get_chip_info
+from esp_flasher.core.chip import get_chip_info
 
 
 class ChipInfoThread(QThread):

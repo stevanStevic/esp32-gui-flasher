@@ -1,9 +1,9 @@
-"""Tests for esp_flasher.core.chip_utils module."""
+"""Tests for esp_flasher.core.chip module."""
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from esp_flasher.core.chip_utils import (
+from esp_flasher.core.chip import (
     EsptoolFlashArgs,
     ChipInfo,
     ESP32ChipInfo,
@@ -14,7 +14,7 @@ from esp_flasher.core.chip_utils import (
     detect_chip,
     get_chip_info,
 )
-from esp_flasher.helpers.utils import Esp_flasherError
+from esp_flasher.core.errors import EspFlasherError
 
 
 class TestEsptoolFlashArgs:
@@ -98,7 +98,7 @@ class TestChipInfoClasses:
 class TestReadChipInfo:
     """Tests for read_chip_info function."""
 
-    @patch("esp_flasher.core.chip_utils.read_chip_property")
+    @patch("esp_flasher.core.chip.read_chip_property")
     def test_esp32_chip_info(self, mock_read_prop):
         """Should return ESP32ChipInfo with correctly parsed features."""
         import esptool
@@ -123,7 +123,7 @@ class TestReadChipInfo:
         assert result.has_bluetooth is True
         assert result.has_embedded_flash is True
 
-    @patch("esp_flasher.core.chip_utils.read_chip_property")
+    @patch("esp_flasher.core.chip.read_chip_property")
     def test_esp32_single_core(self, mock_read_prop):
         """Single core chip should have num_cores=1."""
         import esptool
@@ -140,20 +140,20 @@ class TestReadChipInfo:
         assert result.cpu_frequency == "160MHz"
         assert result.has_bluetooth is False
 
-    @patch("esp_flasher.core.chip_utils.read_chip_property")
+    @patch("esp_flasher.core.chip.read_chip_property")
     def test_unknown_chip_raises(self, mock_read_prop):
-        """Non-ESP32 chip should raise Esp_flasherError."""
+        """Non-ESP32 chip should raise EspFlasherError."""
         mock_chip = MagicMock()  # Not an ESP32ROM instance
         mock_read_prop.return_value = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66]
 
-        with pytest.raises(Esp_flasherError, match="Unknown chip type"):
+        with pytest.raises(EspFlasherError, match="Unknown chip type"):
             read_chip_info(mock_chip)
 
 
 class TestReadChipProperty:
     """Tests for read_chip_property function."""
 
-    @patch("esp_flasher.core.chip_utils.prevent_print")
+    @patch("esp_flasher.core.chip.prevent_print")
     def test_success(self, mock_prevent):
         """Should delegate to prevent_print and return result."""
         mock_prevent.return_value = "test_value"
@@ -163,20 +163,20 @@ class TestReadChipProperty:
         mock_prevent.assert_called_once_with(mock_func, "arg1", key="val")
         assert result == "test_value"
 
-    @patch("esp_flasher.core.chip_utils.prevent_print")
+    @patch("esp_flasher.core.chip.prevent_print")
     def test_fatal_error(self, mock_prevent):
-        """esptool.FatalError should be wrapped in Esp_flasherError."""
+        """esptool.FatalError should be wrapped in EspFlasherError."""
         import esptool
         mock_prevent.side_effect = esptool.FatalError("chip read error")
 
-        with pytest.raises(Esp_flasherError, match="Reading chip details failed"):
+        with pytest.raises(EspFlasherError, match="Reading chip details failed"):
             read_chip_property(MagicMock())
 
 
 class TestDetectChip:
     """Tests for detect_chip function."""
 
-    @patch("esp_flasher.core.chip_utils.esptool")
+    @patch("esp_flasher.core.chip.esptool")
     def test_success(self, mock_esptool):
         """Should return the connected device."""
         mock_chip = MagicMock()
@@ -192,13 +192,13 @@ class TestDetectChip:
             initial_baud=115200,
         )
 
-    @patch("esp_flasher.core.chip_utils.esptool")
+    @patch("esp_flasher.core.chip.esptool")
     def test_fatal_error(self, mock_esptool):
-        """FatalError should be wrapped in Esp_flasherError."""
+        """FatalError should be wrapped in EspFlasherError."""
         mock_esptool.FatalError = type("FatalError", (Exception,), {})
         mock_esptool.get_default_connected_device.side_effect = mock_esptool.FatalError("no device")
 
-        with pytest.raises(Esp_flasherError, match="ESP Chip Auto-Detection failed"):
+        with pytest.raises(EspFlasherError, match="ESP Chip Auto-Detection failed"):
             detect_chip("/dev/ttyUSB0")
 
 
@@ -217,15 +217,15 @@ class TestChipRunStub:
         mock_chip = MagicMock()
         mock_chip.run_stub.side_effect = esptool.FatalError("stub failed")
 
-        with pytest.raises(Esp_flasherError, match="Error putting ESP in stub flash mode"):
+        with pytest.raises(EspFlasherError, match="Error putting ESP in stub flash mode"):
             chip_run_stub(mock_chip)
 
 
 class TestGetChipInfo:
     """Tests for get_chip_info convenience function."""
 
-    @patch("esp_flasher.core.chip_utils.read_chip_info")
-    @patch("esp_flasher.core.chip_utils.detect_chip")
+    @patch("esp_flasher.core.chip.read_chip_info")
+    @patch("esp_flasher.core.chip.detect_chip")
     def test_returns_info_and_closes_port(self, mock_detect, mock_read):
         mock_chip = MagicMock()
         mock_detect.return_value = mock_chip
@@ -239,8 +239,8 @@ class TestGetChipInfo:
         mock_read.assert_called_once_with(mock_chip)
         mock_chip._port.close.assert_called_once()
 
-    @patch("esp_flasher.core.chip_utils.read_chip_info")
-    @patch("esp_flasher.core.chip_utils.detect_chip")
+    @patch("esp_flasher.core.chip.read_chip_info")
+    @patch("esp_flasher.core.chip.detect_chip")
     def test_closes_port_on_error(self, mock_detect, mock_read):
         mock_chip = MagicMock()
         mock_detect.return_value = mock_chip

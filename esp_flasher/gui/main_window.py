@@ -1,5 +1,6 @@
 import sys
 import logging
+import traceback
 
 from PyQt5.QtWidgets import (
     QMainWindow,
@@ -17,10 +18,11 @@ from esp_flasher.gui.chip_info import ChipInfoSection
 from esp_flasher.gui.firmware_section import FirmwareSection
 from esp_flasher.gui.actions_section import ActionsSection
 from esp_flasher.gui.module_loader import load_modules
-from esp_flasher.helpers.utils import load_config
+from esp_flasher.gui.app_state import AppState
+from esp_flasher.config import load_config
 from esp_flasher.core.const import __version__
-from esp_flasher.helpers.log_handler import FlashLogHandler, StdoutRedirector
-from esp_flasher.model.test_module import TestModule
+from esp_flasher.gui.log_handler import FlashLogHandler, StdoutRedirector
+from esp_flasher.model.test_module import DeviceTestModule
 from esp_flasher.helpers.resource_helper import resource_path
 
 logger = logging.getLogger(__name__)
@@ -39,7 +41,6 @@ def show_popup(title, message, icon, parent=None):
 class MainWindow(QMainWindow):
     def __init__(self, module_paths=None):
         super().__init__()
-        import traceback
 
         def excepthook(type, value, tb):
             traceback.print_exception(type, value, tb)
@@ -49,23 +50,21 @@ class MainWindow(QMainWindow):
 
         self._module_paths = module_paths or []
         self._modules = []
-        self._firmware = None
-        self._chip_port = None
-        self._printer_port = None
-        self._api_endpoint = ""
-        self._api_key = ""
-        self._api_secret = ""
-        self._mac_address = None
-        self._device_name = ""
-        self._successful_flash_count = 0
-        self._testing_enabled = False
-        self._test_board_xth_occurrence = 0
-        self._test_success_regex = ""
-        self._is_testing_active = False
-        self._test_timeout_seconds = 30
-        self.test_module = None
+        self.testing_popup = None
+
+        # Centralised application state
+        self.state = AppState()
 
         self.init_ui()
+
+        # Wire UI callbacks into state
+        self.state.console = self.console
+        self.state.set_log_file = self.set_log_file
+        self.state.close_log_file = self.close_log_file
+        self.state.show_error_popup = self.show_error_popup
+        self.state.show_success_popup = self.show_success_popup
+        self.state.show_testing_popup = self.show_testing_popup
+        self.state.close_testing_popup = self.close_testing_popup
 
         self.log_handler = FlashLogHandler(text_edit=None)
         logging.basicConfig(level=logging.INFO, handlers=[self.log_handler])
@@ -90,24 +89,24 @@ class MainWindow(QMainWindow):
 
         # Apply chip port and firmware path
         self.port_config.chip_port_combobox.setCurrentText(config.get("chip_port", ""))
-        self._firmware = config.get("firmware_path", "")
-        self.firmware_section.firmware_button.setText(self._firmware)
+        self.state.firmware = config.get("firmware_path", "")
+        self.firmware_section.firmware_button.setText(self.state.firmware)
 
         # Apply testing settings
         testing_settings = config.get("testing_settings", {})
-        self._testing_enabled = testing_settings.get("enabled", False)
-        self._test_board_xth_occurrence = testing_settings.get(
+        testing_enabled = testing_settings.get("enabled", False)
+        test_board_xth_occurrence = testing_settings.get(
             "test_board_xth_occurrence", 0
         )
-        self._test_success_regex = testing_settings.get("test_success_regex", "")
-        self._test_timeout_seconds = testing_settings.get("test_timeout_seconds", 200)
+        test_success_regex = testing_settings.get("test_success_regex", "")
+        test_timeout_seconds = testing_settings.get("test_timeout_seconds", 200)
 
         # Instantiate the model with latest config
-        self.test_module = TestModule(
-            self._test_success_regex,
-            self._test_timeout_seconds,
-            self._testing_enabled,
-            self._test_board_xth_occurrence,
+        self.state.test_module = DeviceTestModule(
+            test_success_regex,
+            test_timeout_seconds,
+            testing_enabled,
+            test_board_xth_occurrence,
         )
 
     def init_ui(self):
@@ -126,10 +125,10 @@ class MainWindow(QMainWindow):
         left_layout_widget = QWidget()
         left_layout = QVBoxLayout()
 
-        self.port_config = PortConfig(self)
-        self.chip_info_section = ChipInfoSection(self)
-        self.firmware_section = FirmwareSection(self)
-        self.actions_section = ActionsSection(self)
+        self.port_config = PortConfig(self.state)
+        self.chip_info_section = ChipInfoSection(self.state)
+        self.firmware_section = FirmwareSection(self.state)
+        self.actions_section = ActionsSection(self.state)
 
         # Connect the flash button (now in firmware_section) to actions_section.flash_esp
         self.firmware_section.flash_button.clicked.connect(self.actions_section.flash_esp)
@@ -148,7 +147,7 @@ class MainWindow(QMainWindow):
 
             for module in self._modules:
                 try:
-                    section = module.create_section(self)
+                    section = module.create_section(self.state)
                     left_layout.addWidget(section)
                     logger.info(f"Module section added: {module.get_name()}")
                 except Exception as exc:
@@ -194,7 +193,7 @@ class MainWindow(QMainWindow):
 
     def show_testing_popup(self, message):
         """Displays a non-blocking informational popup indicating that testing is in progress."""
-        if hasattr(self, "testing_popup") and self.testing_popup is not None:
+        if self.testing_popup is not None:
             self.testing_popup.close()
         self.testing_popup = QMessageBox(self)
         self.testing_popup.setIcon(QMessageBox.Warning)
@@ -206,7 +205,7 @@ class MainWindow(QMainWindow):
 
     def close_testing_popup(self):
         """Closes the testing popup if it is open and visible."""
-        if hasattr(self, "testing_popup") and self.testing_popup is not None:
+        if self.testing_popup is not None:
             try:
                 if self.testing_popup.isVisible():
                     self.testing_popup.done(0)  # Force close

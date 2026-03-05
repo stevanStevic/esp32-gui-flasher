@@ -1,6 +1,7 @@
 import esptool
 
-from esp_flasher.helpers.utils import prevent_print, Esp_flasherError
+from esp_flasher.core.errors import EspFlasherError
+from esp_flasher.helpers.utils import prevent_print
 
 
 class EsptoolFlashArgs:
@@ -95,7 +96,7 @@ def read_chip_property(func, *args, **kwargs):
     try:
         return prevent_print(func, *args, **kwargs)
     except esptool.FatalError as err:
-        raise Esp_flasherError(f"Reading chip details failed: {err}") from err
+        raise EspFlasherError(f"Reading chip details failed: {err}") from err
 
 
 def read_chip_info(chip):
@@ -118,14 +119,14 @@ def read_chip_info(chip):
             has_factory_calibrated_adc,
         )
 
-    raise Esp_flasherError(f"Unknown chip type {type(chip)}")
+    raise EspFlasherError(f"Unknown chip type {type(chip)}")
 
 
 def chip_run_stub(chip):
     try:
         return chip.run_stub()
     except esptool.FatalError as err:
-        raise Esp_flasherError(f"Error putting ESP in stub flash mode: {err}") from err
+        raise EspFlasherError(f"Error putting ESP in stub flash mode: {err}") from err
 
 
 def detect_chip(port, baud=115200):
@@ -136,7 +137,7 @@ def detect_chip(port, baud=115200):
         )
         return chip
     except esptool.FatalError as err:
-        raise Esp_flasherError(f"ESP Chip Auto-Detection failed: {err}") from err
+        raise EspFlasherError(f"ESP Chip Auto-Detection failed: {err}") from err
 
 
 def get_chip_info(port):
@@ -146,7 +147,7 @@ def get_chip_info(port):
         A ChipInfo (or subclass) instance.
 
     Raises:
-        Esp_flasherError: on detection or communication failure.
+        EspFlasherError: on detection or communication failure.
     """
     chip = detect_chip(port)
     try:

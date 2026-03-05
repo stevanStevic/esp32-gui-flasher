@@ -17,9 +17,9 @@ from esp_flasher.modules.registration_printing.threads.register_thread import Re
 class RegistrationPrintingSection(QGroupBox):
     """Combined section for Backend Connection, Printer Setup, Register and Print."""
 
-    def __init__(self, parent):
+    def __init__(self, state):
         super().__init__("Device Registration and Printing")
-        self.parent = parent
+        self.state = state
         self.init_ui()
 
     def init_ui(self):
@@ -31,9 +31,9 @@ class RegistrationPrintingSection(QGroupBox):
         layout.addWidget(backend_label)
 
         self.fields = {
-            "API Endpoint": "_api_endpoint",
-            "API Key": "_api_key",
-            "API Secret": "_api_secret",
+            "API Endpoint": "api_endpoint",
+            "API Key": "api_key",
+            "API Secret": "api_secret",
         }
         self.line_edits = {}
 
@@ -43,7 +43,7 @@ class RegistrationPrintingSection(QGroupBox):
             label.setFixedWidth(90)
             line_edit = QLineEdit()
 
-            if var_name in ["_api_key", "_api_secret"]:
+            if var_name in ["api_key", "api_secret"]:
                 line_edit.setEchoMode(QLineEdit.Password)
 
             line_edit.textChanged.connect(
@@ -150,7 +150,7 @@ class RegistrationPrintingSection(QGroupBox):
     # --- Backend handlers ---
 
     def _on_text_changed(self, text, field_name):
-        setattr(self.parent, field_name, text)
+        setattr(self.state, field_name, text)
 
     # --- Printer handlers ---
 
@@ -163,7 +163,7 @@ class RegistrationPrintingSection(QGroupBox):
             self.printer_combobox.addItem("No printers found")
 
     def _select_printer(self, index):
-        self.parent._printer_port = self.printer_combobox.itemText(index)
+        self.state.printer_port = self.printer_combobox.itemText(index)
 
     def test_print(self):
         printer_name = self.printer_combobox.currentText()
@@ -177,7 +177,7 @@ class RegistrationPrintingSection(QGroupBox):
         x_offset = self.x_offset_spinbox.value()
         y_offset = self.y_offset_spinbox.value()
 
-        self.parent.console.clear()
+        self.state.console.clear()
 
         self.print_thread = PrintingThread(
             printer_name,
@@ -193,42 +193,42 @@ class RegistrationPrintingSection(QGroupBox):
     # --- Register & Print handlers ---
 
     def register(self):
-        self.parent.console.clear()
+        self.state.console.clear()
 
         if (
-            not self.parent._api_endpoint
-            or not self.parent._api_key
-            or not self.parent._api_secret
+            not self.state.api_endpoint
+            or not self.state.api_key
+            or not self.state.api_secret
         ):
             logging.error("API endpoint and/or credentials are missing!")
             return
 
-        if not self.parent._mac_address:
+        if not self.state.mac_address:
             logging.error("No MAC address found! Click 'Get Device Info' first.")
             return
 
-        self.parent.console.clear()
+        self.state.console.clear()
         self.register_thread = RegisterThread(
-            self.parent._api_endpoint,
-            self.parent._api_key,
-            self.parent._api_secret,
-            self.parent._mac_address,
+            self.state.api_endpoint,
+            self.state.api_key,
+            self.state.api_secret,
+            self.state.mac_address,
         )
         self.register_thread.device_name_signal.connect(self._update_device_name)
         self.register_thread.start()
 
     def _update_device_name(self, device_name):
-        self.parent._device_name = device_name
+        self.state.device_name = device_name
         logging.info(f"Device Registered: {device_name}")
 
     def print_device(self):
-        self.parent.console.clear()
+        self.state.console.clear()
 
-        if not self.parent._printer_port:
+        if not self.state.printer_port:
             logging.error("No printer port selected!")
             return
 
-        if not self.parent._device_name:
+        if not self.state.device_name:
             logging.error("Device name not obtained, first Register the device.")
             return
 
@@ -239,8 +239,8 @@ class RegistrationPrintingSection(QGroupBox):
         font_size = self.font_size_spinbox.value()
 
         self.print_thread = PrintingThread(
-            self.parent._printer_port,
-            self.parent._device_name,
+            self.state.printer_port,
+            self.state.device_name,
             label_width,
             x_offset,
             y_offset,

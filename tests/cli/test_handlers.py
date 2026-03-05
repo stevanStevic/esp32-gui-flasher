@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock, call
 
 import pytest
 
-from esp_flasher.helpers.utils import Esp_flasherError
+from esp_flasher.core.errors import EspFlasherError
 
 
 # ── handle_info ──────────────────────────────────────────────────────
@@ -59,10 +59,10 @@ class TestHandleFlash:
     def test_propagates_flasher_error(self, mock_run):
         from esp_flasher.cli.handlers import handle_flash
 
-        mock_run.side_effect = Esp_flasherError("flash failed")
+        mock_run.side_effect = EspFlasherError("flash failed")
         args = Namespace(port="/dev/ttyUSB0", firmware="fw.zip", baud_rate=115200)
 
-        with pytest.raises(Esp_flasherError, match="flash failed"):
+        with pytest.raises(EspFlasherError, match="flash failed"):
             handle_flash(args)
 
 
@@ -89,10 +89,10 @@ class TestHandleLogs:
     def test_serial_error_raises(self, mock_read_lines):
         from esp_flasher.cli.handlers import handle_logs
 
-        mock_read_lines.side_effect = Esp_flasherError("Serial error: port busy")
+        mock_read_lines.side_effect = EspFlasherError("Serial error: port busy")
 
         args = Namespace(port="/dev/ttyUSB0")
-        with pytest.raises(Esp_flasherError, match="Serial error"):
+        with pytest.raises(EspFlasherError, match="Serial error"):
             handle_logs(args)
 
 
@@ -142,7 +142,7 @@ class TestHandleTest:
     def test_flash_error_propagates(self, mock_flash):
         from esp_flasher.cli.handlers import handle_test
 
-        mock_flash.side_effect = Esp_flasherError("flash failed")
+        mock_flash.side_effect = EspFlasherError("flash failed")
 
         args = Namespace(
             port="/dev/ttyUSB0",
@@ -151,5 +151,5 @@ class TestHandleTest:
             regex="OK",
             timeout=10,
         )
-        with pytest.raises(Esp_flasherError, match="flash failed"):
+        with pytest.raises(EspFlasherError, match="flash failed"):
             handle_test(args)

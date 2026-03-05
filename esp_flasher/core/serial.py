@@ -3,7 +3,7 @@ import time
 import serial
 import esptool
 
-from esp_flasher.helpers.utils import Esp_flasherError
+from esp_flasher.core.errors import EspFlasherError
 
 
 def list_serial_ports():
@@ -26,7 +26,7 @@ def read_serial_lines(port, baudrate=115200, timeout=1, should_stop=None):
             the caller can stop even when no data arrives.
 
     Raises:
-        Esp_flasherError: on serial communication failure.
+        EspFlasherError: on serial communication failure.
     """
     try:
         with serial.Serial(port, baudrate=baudrate, timeout=timeout) as ser:
@@ -45,4 +45,4 @@ def read_serial_lines(port, baudrate=115200, timeout=1, should_stop=None):
                 else:
                     time.sleep(0.01)  # avoid busy-wait when idle
     except serial.SerialException as exc:
-        raise Esp_flasherError(f"Serial error: {exc}") from exc
+        raise EspFlasherError(f"Serial error: {exc}") from exc

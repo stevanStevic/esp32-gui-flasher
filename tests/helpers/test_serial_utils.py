@@ -1,15 +1,15 @@
-"""Tests for esp_flasher.helpers.serial_utils module."""
+"""Tests for esp_flasher.core.serial module."""
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from esp_flasher.helpers.serial_utils import list_serial_ports
+from esp_flasher.core.serial import list_serial_ports
 
 
 class TestListSerialPorts:
     """Tests for list_serial_ports function."""
 
-    @patch("esp_flasher.helpers.serial_utils.esptool")
+    @patch("esp_flasher.core.serial.esptool")
     def test_returns_port_list(self, mock_esptool):
         """Should delegate to esptool.get_port_list."""
         mock_esptool.get_port_list.return_value = [

@@ -6,13 +6,13 @@ from PyQt5.QtWidgets import (
     QLabel,
     QComboBox,
 )
-from esp_flasher.helpers.serial_utils import list_serial_ports
+from esp_flasher.core.serial import list_serial_ports
 
 
 class PortConfig(QGroupBox):
-    def __init__(self, parent):
+    def __init__(self, state):
         super().__init__("Chip Port Configuration")
-        self.parent = parent
+        self.state = state
         self.init_ui()
 
     def init_ui(self):
@@ -45,4 +45,4 @@ class PortConfig(QGroupBox):
             self.chip_port_combobox.addItem("No serial ports found")
 
     def select_port(self, index):
-        self.parent._chip_port = self.chip_port_combobox.itemText(index)
+        self.state.chip_port = self.chip_port_combobox.itemText(index)

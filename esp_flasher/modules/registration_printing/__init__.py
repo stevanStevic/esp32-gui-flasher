@@ -25,8 +25,8 @@ class RegistrationPrintingModule(GUIModule):
     def get_name(self) -> str:
         return "Device Registration and Printing"
 
-    def create_section(self, parent):
-        self._section = RegistrationPrintingSection(parent)
+    def create_section(self, state):
+        self._section = RegistrationPrintingSection(state)
         return self._section
 
     def apply_config(self, config: dict) -> None:
@@ -56,13 +56,13 @@ class RegistrationPrintingModule(GUIModule):
 
         # API / backend settings
         api_settings = config.get("api_settings", {})
-        self._section.line_edits["_api_endpoint"].setText(
+        self._section.line_edits["api_endpoint"].setText(
             api_settings.get("api_endpoint", "")
         )
-        self._section.line_edits["_api_key"].setText(
+        self._section.line_edits["api_key"].setText(
             api_settings.get("api_key", "")
         )
-        self._section.line_edits["_api_secret"].setText(
+        self._section.line_edits["api_secret"].setText(
             api_settings.get("api_secret", "")
         )
 

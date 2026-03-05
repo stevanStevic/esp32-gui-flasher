@@ -1,21 +1,15 @@
 import datetime
 import io
-import json
 import os
 import sys
 
 import serial
 
-
-class Esp_flasherError(Exception):
-    pass
-
-
 from esp_flasher.core.const import HTTP_REGEX
+from esp_flasher.core.errors import EspFlasherError
 
 # pylint: disable=unspecified-encoding,consider-using-with
 DEVNULL = open(os.devnull, "w")
-CONFIG_PATH = "config/config.json"
 
 
 def open_downloadable_binary(path):
@@ -30,11 +24,11 @@ def open_downloadable_binary(path):
             response = requests.get(path)
             response.raise_for_status()
         except requests.exceptions.Timeout as err:
-            raise Esp_flasherError(
+            raise EspFlasherError(
                 f"Timeout while retrieving firmware file '{path}': {err}"
             ) from err
         except requests.exceptions.RequestException as err:
-            raise Esp_flasherError(
+            raise EspFlasherError(
                 f"Error while retrieving firmware file '{path}': {err}"
             ) from err
 
@@ -46,7 +40,7 @@ def open_downloadable_binary(path):
     try:
         return open(path, "rb")
     except IOError as err:
-        raise Esp_flasherError(f"Error opening binary '{path}': {err}") from err
+        raise EspFlasherError(f"Error opening binary '{path}': {err}") from err
 
 
 def prevent_print(func, *args, **kwargs):
@@ -55,22 +49,9 @@ def prevent_print(func, *args, **kwargs):
     try:
         return func(*args, **kwargs)
     except serial.SerialException as err:
-        raise Esp_flasherError("Serial port closed: {}".format(err)) from err
+        raise EspFlasherError("Serial port closed: {}".format(err)) from err
     finally:
         sys.stdout = orig_sys_stdout
-
-
-def load_config(path=CONFIG_PATH):
-    """Loads configuration from the .config JSON file."""
-    if not os.path.exists(path):
-        raise Esp_flasherError(f"Config file {path} not found.")
-
-    try:
-        with open(path, "r") as config_file:
-            config = json.load(config_file)
-            return config
-    except json.JSONDecodeError as e:
-        raise Esp_flasherError(f"Error parsing config file: {e}")
 
 
 def get_device_dir(device_name=None, mac_address=None):

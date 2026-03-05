@@ -1,4 +1,4 @@
-class TestModule:
+class DeviceTestModule:
     def __init__(
         self, regex, timeout_seconds, test_enabled=False, test_board_xth_occurrence=0
     ):

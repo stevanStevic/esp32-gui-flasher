@@ -3,8 +3,8 @@ from unittest.mock import patch, MagicMock, call
 
 import pytest
 
-from esp_flasher.core.chip_utils import EsptoolFlashArgs
-from esp_flasher.helpers.utils import Esp_flasherError
+from esp_flasher.core.chip import EsptoolFlashArgs
+from esp_flasher.core.errors import EspFlasherError
 
 
 def _make_firmware_args(chip="esp32s3", no_stub=False):
@@ -137,7 +137,7 @@ class TestRunEspFlasher:
     def test_flash_esptool_fatal_error(
         self, mock_config, mock_extract, mock_configure, mock_esptool
     ):
-        """When esptool raises FatalError, should raise Esp_flasherError."""
+        """When esptool raises FatalError, should raise EspFlasherError."""
         mock_config.return_value = {"flash_encryption": {}, "secure_boot": {}}
         mock_extract.return_value = ({"security": {}}, "/tmp/extract")
         mock_configure.return_value = _make_firmware_args()
@@ -145,5 +145,5 @@ class TestRunEspFlasher:
         mock_esptool.main.side_effect = mock_esptool.FatalError("write failed")
 
         from esp_flasher.core.flasher import run_esp_flasher
-        with pytest.raises(Esp_flasherError, match="Error while writing flash"):
+        with pytest.raises(EspFlasherError, match="Error while writing flash"):
             run_esp_flasher("/dev/ttyUSB0", "/path/firmware.zip")

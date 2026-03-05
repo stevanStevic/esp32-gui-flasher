@@ -1,9 +1,9 @@
-"""Tests for esp_flasher.threads.test_thread (TestThread logic)."""
+"""Tests for esp_flasher.gui.threads.test_thread (TestThread logic)."""
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from esp_flasher.model.test_module import TestModule
+from esp_flasher.model.test_module import DeviceTestModule
 
 
 class TestTestThreadLogic:
@@ -12,13 +12,13 @@ class TestTestThreadLogic:
     We import TestThread and test its log processing method with mocked signals.
     """
 
-    @patch("esp_flasher.threads.test_thread.QTimer")
-    @patch("esp_flasher.threads.test_thread.QObject.__init__", return_value=None)
+    @patch("esp_flasher.gui.threads.test_thread.QTimer")
+    @patch("esp_flasher.gui.threads.test_thread.QObject.__init__", return_value=None)
     def test_process_log_line_match(self, mock_qobj_init, mock_qtimer):
         """Matching log line should stop test and emit success signal."""
-        from esp_flasher.threads.test_thread import TestThread
+        from esp_flasher.gui.threads.test_thread import TestThread
 
-        model = TestModule(
+        model = DeviceTestModule(
             regex=r"Multicore\s+app",
             timeout_seconds=10,
             test_enabled=True,
@@ -36,13 +36,13 @@ class TestTestThreadLogic:
         assert model.is_testing is False
         thread.test_success_signal.emit.assert_called_once_with("Device testing passed!")
 
-    @patch("esp_flasher.threads.test_thread.QTimer")
-    @patch("esp_flasher.threads.test_thread.QObject.__init__", return_value=None)
+    @patch("esp_flasher.gui.threads.test_thread.QTimer")
+    @patch("esp_flasher.gui.threads.test_thread.QObject.__init__", return_value=None)
     def test_process_log_line_no_match(self, mock_qobj_init, mock_qtimer):
         """Non-matching log line should NOT stop the test."""
-        from esp_flasher.threads.test_thread import TestThread
+        from esp_flasher.gui.threads.test_thread import TestThread
 
-        model = TestModule(
+        model = DeviceTestModule(
             regex=r"Multicore\s+app",
             timeout_seconds=10,
             test_enabled=True,
@@ -59,13 +59,13 @@ class TestTestThreadLogic:
         assert model.is_testing is True
         thread.test_success_signal.emit.assert_not_called()
 
-    @patch("esp_flasher.threads.test_thread.QTimer")
-    @patch("esp_flasher.threads.test_thread.QObject.__init__", return_value=None)
+    @patch("esp_flasher.gui.threads.test_thread.QTimer")
+    @patch("esp_flasher.gui.threads.test_thread.QObject.__init__", return_value=None)
     def test_process_log_line_not_testing(self, mock_qobj_init, mock_qtimer):
         """When not testing, matching line should be ignored."""
-        from esp_flasher.threads.test_thread import TestThread
+        from esp_flasher.gui.threads.test_thread import TestThread
 
-        model = TestModule(
+        model = DeviceTestModule(
             regex=r"Multicore\s+app",
             timeout_seconds=10,
         )
@@ -79,13 +79,13 @@ class TestTestThreadLogic:
 
         thread.test_success_signal.emit.assert_not_called()
 
-    @patch("esp_flasher.threads.test_thread.QTimer")
-    @patch("esp_flasher.threads.test_thread.QObject.__init__", return_value=None)
+    @patch("esp_flasher.gui.threads.test_thread.QTimer")
+    @patch("esp_flasher.gui.threads.test_thread.QObject.__init__", return_value=None)
     def test_on_timeout(self, mock_qobj_init, mock_qtimer):
         """Timeout while testing should emit failure signal."""
-        from esp_flasher.threads.test_thread import TestThread
+        from esp_flasher.gui.threads.test_thread import TestThread
 
-        model = TestModule(
+        model = DeviceTestModule(
             regex=r"test",
             timeout_seconds=5,
             test_enabled=True,

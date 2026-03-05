@@ -6,8 +6,9 @@ import os
 import espefuse
 import espsecure
 
-from esp_flasher.core.chip_utils import EsptoolFlashArgs
-from esp_flasher.helpers.utils import load_config, Esp_flasherError
+from esp_flasher.core.chip import EsptoolFlashArgs
+from esp_flasher.config import load_config
+from esp_flasher.core.errors import EspFlasherError
 
 
 def extract_firmware(firmware_path):
@@ -58,14 +59,14 @@ def enable_secure_boot(app_config, port, baud_rate, flasher_args, extract_dir):
     # If release has security enabled then we need to specify block for digest flashing.
     # this can be extended to support multi-digest signing etc.
     if app_config.get("public_key_digest_block_index", None) is None:
-        raise Esp_flasherError(f"Public key digest block not specified!")
+        raise EspFlasherError(f"Public key digest block not specified!")
 
     block_idx = app_config.get("public_key_digest_block_index")
 
     digest_path = flasher_args.get("security", {}).get("digest_file", "")
     digest_file = os.path.join(extract_dir, digest_path)
     if not os.path.exists(digest_file):
-        raise Esp_flasherError(f"Public key digest file not found: {digest_file}")
+        raise EspFlasherError(f"Public key digest file not found: {digest_file}")
 
     # Burn the secure boot public key digest.
     espefuse.main(
@@ -118,12 +119,12 @@ def enable_flash_encryption(app_config, port, extract_dir):
         espsecure.main(["generate_flash_encryption_key", key_file])
 
     if not os.path.exists(key_file):
-        raise Esp_flasherError(f"Flash encryption key not found: {key_file}")
+        raise EspFlasherError(f"Flash encryption key not found: {key_file}")
 
     # If release has encryption enabled then we need to specify block for encryption key.
     # This can be extended to support multi encryption keys.
     if app_config.get("encryption_key_block_index", None) is None:
-        raise Esp_flasherError(f"Encryption key block not specified!")
+        raise EspFlasherError(f"Encryption key block not specified!")
 
     block_idx = app_config.get("encryption_key_block_index")
 

@@ -1,8 +1,8 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 import logging
 
-from esp_flasher.helpers.serial_utils import read_serial_lines
-from esp_flasher.helpers.utils import Esp_flasherError
+from esp_flasher.core.serial import read_serial_lines
+from esp_flasher.core.errors import EspFlasherError
 
 
 class LogThread(QThread):
@@ -27,7 +27,7 @@ class LogThread(QThread):
                     break
                 logging.info(line)
                 self.log_signal.emit(line)
-        except Esp_flasherError as e:
+        except EspFlasherError as e:
             self.error_signal.emit(str(e))
         except Exception as e:
             self.error_signal.emit(f"Log Error: {str(e)}")

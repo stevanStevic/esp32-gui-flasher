@@ -35,13 +35,15 @@ class GUIModule(ABC):
         ...
 
     @abstractmethod
-    def create_section(self, parent) -> QGroupBox:
+    def create_section(self, state) -> QGroupBox:
         """Build and return the QGroupBox widget for this module.
 
         Args:
-            parent: The MainWindow instance. Use it to read/write shared
-                    application state such as ``parent._mac_address``,
-                    ``parent._chip_port``, ``parent._firmware``, etc.
+            state: The :class:`~esp_flasher.gui.app_state.AppState` instance.
+                   Use it to read/write shared application state such as
+                   ``state.mac_address``, ``state.chip_port``,
+                   ``state.firmware``, etc.  UI callbacks like
+                   ``state.show_error_popup()`` are also available.
 
         Returns:
             A QGroupBox that will be added to the left panel of the GUI.

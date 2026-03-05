@@ -2,9 +2,9 @@ from PyQt5.QtWidgets import QGroupBox, QGridLayout, QLabel, QPushButton, QFileDi
 
 
 class FirmwareSection(QGroupBox):
-    def __init__(self, parent):
+    def __init__(self, state):
         super().__init__("Firmware")
-        self.parent = parent
+        self.state = state
         self.init_ui()
 
     def init_ui(self):
@@ -32,5 +32,5 @@ class FirmwareSection(QGroupBox):
             options=options,
         )
         if file_name:
-            self.parent._firmware = file_name
+            self.state.firmware = file_name
             self.firmware_button.setText(file_name)

@@ -1,4 +1,4 @@
-"""Tests for esp_flasher.core.firmware_utils module."""
+"""Tests for esp_flasher.core.firmware module."""
 import json
 import os
 import zipfile
@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock, call
 
 import pytest
 
-from esp_flasher.helpers.utils import Esp_flasherError
+from esp_flasher.core.errors import EspFlasherError
 
 
 class TestExtractFirmware:
@@ -14,7 +14,7 @@ class TestExtractFirmware:
 
     def test_extract_success(self, firmware_zip, sample_flasher_args):
         """Successful extraction returns (flasher_args dict, temp_dir path)."""
-        from esp_flasher.core.firmware_utils import extract_firmware
+        from esp_flasher.core.firmware import extract_firmware
 
         flasher_args, temp_dir = extract_firmware(firmware_zip)
 
@@ -27,14 +27,14 @@ class TestExtractFirmware:
 
     def test_extract_file_not_found(self):
         """Non-existent firmware path raises FileNotFoundError."""
-        from esp_flasher.core.firmware_utils import extract_firmware
+        from esp_flasher.core.firmware import extract_firmware
 
         with pytest.raises(FileNotFoundError, match="Firmware file not found"):
             extract_firmware("/nonexistent/firmware.zip")
 
     def test_extract_missing_flasher_args(self, tmp_path):
         """ZIP without flasher_args.json raises FileNotFoundError."""
-        from esp_flasher.core.firmware_utils import extract_firmware
+        from esp_flasher.core.firmware import extract_firmware
 
         # Create a ZIP with only a dummy file
         zip_path = tmp_path / "bad_firmware.zip"
@@ -52,7 +52,7 @@ class TestConfigureWriteFlashArgs:
 
     def test_configure_basic(self, tmp_path, sample_flasher_args):
         """Verify EsptoolFlashArgs fields are correctly populated."""
-        from esp_flasher.core.firmware_utils import configure_write_flash_args
+        from esp_flasher.core.firmware import configure_write_flash_args
 
         # Create dummy bin files in tmp_path
         for name in ["bootloader.bin", "app.bin", "partition-table.bin"]:
@@ -77,7 +77,7 @@ class TestConfigureWriteFlashArgs:
 
     def test_configure_no_stub(self, tmp_path, sample_flasher_args):
         """When stub is False, no_stub should be True."""
-        from esp_flasher.core.firmware_utils import configure_write_flash_args
+        from esp_flasher.core.firmware import configure_write_flash_args
 
         sample_flasher_args["extra_esptool_args"]["stub"] = False
         for name in ["bootloader.bin", "app.bin", "partition-table.bin"]:
@@ -90,10 +90,10 @@ class TestConfigureWriteFlashArgs:
 class TestEnableSecureBoot:
     """Tests for enable_secure_boot function."""
 
-    @patch("esp_flasher.core.firmware_utils.espefuse")
+    @patch("esp_flasher.core.firmware.espefuse")
     def test_secure_boot_success(self, mock_espefuse, tmp_path):
         """Successful secure boot burns key digest then enables SECURE_BOOT_EN."""
-        from esp_flasher.core.firmware_utils import enable_secure_boot
+        from esp_flasher.core.firmware import enable_secure_boot
 
         # Create digest file
         digest_file = tmp_path / "digest.bin"
@@ -120,33 +120,33 @@ class TestEnableSecureBoot:
         assert "SECURE_BOOT_EN" in second_args
 
     def test_secure_boot_missing_block_index(self, tmp_path):
-        """Missing public_key_digest_block_index raises Esp_flasherError."""
-        from esp_flasher.core.firmware_utils import enable_secure_boot
+        """Missing public_key_digest_block_index raises EspFlasherError."""
+        from esp_flasher.core.firmware import enable_secure_boot
 
         app_config = {"public_key_digest_block_index": None}
-        with pytest.raises(Esp_flasherError, match="Public key digest block not specified"):
+        with pytest.raises(EspFlasherError, match="Public key digest block not specified"):
             enable_secure_boot(app_config, "/dev/ttyUSB0", 460800, {}, str(tmp_path))
 
-    @patch("esp_flasher.core.firmware_utils.espefuse")
+    @patch("esp_flasher.core.firmware.espefuse")
     def test_secure_boot_missing_digest_file(self, mock_espefuse, tmp_path):
-        """Missing digest file raises Esp_flasherError."""
-        from esp_flasher.core.firmware_utils import enable_secure_boot
+        """Missing digest file raises EspFlasherError."""
+        from esp_flasher.core.firmware import enable_secure_boot
 
         app_config = {"public_key_digest_block_index": 0}
         flasher_args = {"security": {"digest_file": "nonexistent.bin"}}
 
-        with pytest.raises(Esp_flasherError, match="Public key digest file not found"):
+        with pytest.raises(EspFlasherError, match="Public key digest file not found"):
             enable_secure_boot(app_config, "/dev/ttyUSB0", 460800, flasher_args, str(tmp_path))
 
 
 class TestEnableFlashEncryption:
     """Tests for enable_flash_encryption function."""
 
-    @patch("esp_flasher.core.firmware_utils.espefuse")
-    @patch("esp_flasher.core.firmware_utils.espsecure")
+    @patch("esp_flasher.core.firmware.espefuse")
+    @patch("esp_flasher.core.firmware.espsecure")
     def test_generate_key(self, mock_espsecure, mock_espefuse, tmp_path):
         """When not using customer key, generates key then burns it."""
-        from esp_flasher.core.firmware_utils import enable_flash_encryption
+        from esp_flasher.core.firmware import enable_flash_encryption
 
         # espsecure.main should create the key file as a side effect
         key_path = os.path.join(str(tmp_path), "flash_encrypt_key.bin")
@@ -176,11 +176,11 @@ class TestEnableFlashEncryption:
         assert "BLOCK_KEY1" in burn_args
         assert "XTS_AES_128_KEY" in burn_args
 
-    @patch("esp_flasher.core.firmware_utils.espefuse")
-    @patch("esp_flasher.core.firmware_utils.espsecure")
+    @patch("esp_flasher.core.firmware.espefuse")
+    @patch("esp_flasher.core.firmware.espsecure")
     def test_customer_key(self, mock_espsecure, mock_espefuse, tmp_path):
         """When using customer key, does NOT generate key, just burns the provided one."""
-        from esp_flasher.core.firmware_utils import enable_flash_encryption
+        from esp_flasher.core.firmware import enable_flash_encryption
 
         # Create the customer key file
         key_file = tmp_path / "customer_key.bin"
@@ -204,8 +204,8 @@ class TestEnableFlashEncryption:
         assert str(key_file) in burn_args
 
     def test_missing_block_index(self, tmp_path):
-        """Missing encryption_key_block_index raises Esp_flasherError."""
-        from esp_flasher.core.firmware_utils import enable_flash_encryption
+        """Missing encryption_key_block_index raises EspFlasherError."""
+        from esp_flasher.core.firmware import enable_flash_encryption
 
         # Create a key file so we pass the file-exists check
         key_file = tmp_path / "key.bin"
@@ -217,17 +217,17 @@ class TestEnableFlashEncryption:
             "encryption_key_block_index": None,
         }
 
-        with pytest.raises(Esp_flasherError, match="Encryption key block not specified"):
+        with pytest.raises(EspFlasherError, match="Encryption key block not specified"):
             enable_flash_encryption(app_config, "/dev/ttyUSB0", str(tmp_path))
 
 
 class TestBurnAndProtectSecurityEfuses:
     """Tests for burn_and_protect_security_efuses function."""
 
-    @patch("esp_flasher.core.firmware_utils.espefuse")
+    @patch("esp_flasher.core.firmware.espefuse")
     def test_burn_success(self, mock_espefuse):
         """Burns security eFuses and write-protects them."""
-        from esp_flasher.core.firmware_utils import burn_and_protect_security_efuses
+        from esp_flasher.core.firmware import burn_and_protect_security_efuses
 
         burn_and_protect_security_efuses("/dev/ttyUSB0")
 
@@ -255,20 +255,20 @@ class TestBurnAndProtectSecurityEfuses:
         assert "write_protect_efuse" in wp2_args
         assert "RD_DIS" in wp2_args
 
-    @patch("esp_flasher.core.firmware_utils.espefuse")
+    @patch("esp_flasher.core.firmware.espefuse")
     def test_burn_failure_raises(self, mock_espefuse):
         """When espefuse.main raises, exception should propagate."""
-        from esp_flasher.core.firmware_utils import burn_and_protect_security_efuses
+        from esp_flasher.core.firmware import burn_and_protect_security_efuses
 
         mock_espefuse.main.side_effect = RuntimeError("eFuse burn failed")
 
         with pytest.raises(RuntimeError, match="eFuse burn failed"):
             burn_and_protect_security_efuses("/dev/ttyUSB0")
 
-    @patch("esp_flasher.core.firmware_utils.espefuse")
+    @patch("esp_flasher.core.firmware.espefuse")
     def test_write_protect_failure_raises(self, mock_espefuse):
         """When write-protect step fails, exception should propagate."""
-        from esp_flasher.core.firmware_utils import burn_and_protect_security_efuses
+        from esp_flasher.core.firmware import burn_and_protect_security_efuses
 
         # First call (burn) succeeds, second call (write_protect) fails
         mock_espefuse.main.side_effect = [None, RuntimeError("write-protect failed")]

@@ -8,10 +8,10 @@ layer — they contain no GUI or threading logic.
 import re
 import time
 
-from esp_flasher.core.chip_utils import get_chip_info
+from esp_flasher.core.chip import get_chip_info
 from esp_flasher.core.flasher import run_esp_flasher
-from esp_flasher.helpers.utils import Esp_flasherError
-from esp_flasher.helpers.serial_utils import read_serial_lines
+from esp_flasher.core.errors import EspFlasherError
+from esp_flasher.core.serial import read_serial_lines
 
 
 # ── info ─────────────────────────────────────────────────────────────

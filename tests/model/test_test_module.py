@@ -1,15 +1,15 @@
 """Tests for esp_flasher.model.test_module module."""
 import pytest
 
-from esp_flasher.model.test_module import TestModule
+from esp_flasher.model.test_module import DeviceTestModule
 
 
 class TestTestModule:
-    """Tests for TestModule class."""
+    """Tests for DeviceTestModule class."""
 
     def test_initial_state(self):
         """Default state: count=0, not testing."""
-        module = TestModule(
+        module = DeviceTestModule(
             regex="test_pattern",
             timeout_seconds=10,
         )
@@ -22,7 +22,7 @@ class TestTestModule:
 
     def test_increment_flash_count(self):
         """increment_flash_count increases the counter."""
-        module = TestModule(regex="", timeout_seconds=5)
+        module = DeviceTestModule(regex="", timeout_seconds=5)
         module.increment_flash_count()
         module.increment_flash_count()
         module.increment_flash_count()
@@ -30,7 +30,7 @@ class TestTestModule:
 
     def test_should_run_test_disabled(self):
         """When test_enabled is False, should_run_test always returns False."""
-        module = TestModule(
+        module = DeviceTestModule(
             regex="pattern",
             timeout_seconds=10,
             test_enabled=False,
@@ -42,7 +42,7 @@ class TestTestModule:
 
     def test_should_run_test_every_nth(self):
         """should_run_test returns True only every Nth flash."""
-        module = TestModule(
+        module = DeviceTestModule(
             regex="pattern",
             timeout_seconds=10,
             test_enabled=True,
@@ -71,7 +71,7 @@ class TestTestModule:
 
     def test_should_run_test_zero_occurrence(self):
         """When test_board_xth_occurrence is 0, should never run (avoid ZeroDivisionError)."""
-        module = TestModule(
+        module = DeviceTestModule(
             regex="pattern",
             timeout_seconds=10,
             test_enabled=True,
