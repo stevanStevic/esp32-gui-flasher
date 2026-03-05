@@ -55,6 +55,11 @@ class RegistrationPrintingSection(QGroupBox):
             row_layout.addWidget(line_edit, 1)
             layout.addLayout(row_layout)
 
+        # Register button (right after backend connection fields)
+        self.register_button = QPushButton("Register Device")
+        self.register_button.clicked.connect(self.register)
+        layout.addWidget(self.register_button)
+
         # --- Printer Setup ---
         printer_label = QLabel("Printer Setup")
         printer_label.setStyleSheet("font-weight: bold; color: white; font-size: 13px; margin-top: 6px;")
@@ -135,19 +140,10 @@ class RegistrationPrintingSection(QGroupBox):
         test_print_layout.addWidget(test_print_button)
         layout.addLayout(test_print_layout)
 
-        # --- Register & Print Buttons ---
-        actions_label = QLabel("Device Actions")
-        actions_label.setStyleSheet("font-weight: bold; color: white; font-size: 13px; margin-top: 6px;")
-        layout.addWidget(actions_label)
-
-        actions_layout = QHBoxLayout()
-        self.register_button = QPushButton("Register Device")
-        self.register_button.clicked.connect(self.register)
+        # Print button (after printer setup)
         self.print_button = QPushButton("Print")
         self.print_button.clicked.connect(self.print_device)
-        actions_layout.addWidget(self.register_button)
-        actions_layout.addWidget(self.print_button)
-        layout.addLayout(actions_layout)
+        layout.addWidget(self.print_button)
 
         self.setLayout(layout)
 
