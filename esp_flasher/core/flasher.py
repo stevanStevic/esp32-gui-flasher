@@ -1,13 +1,14 @@
 import esptool
 
-from esp_flasher.core.firmware_utils import (
+from esp_flasher.core.firmware import (
     burn_and_protect_security_efuses,
     extract_firmware,
     enable_secure_boot,
     enable_flash_encryption,
     configure_write_flash_args,
 )
-from esp_flasher.helpers.utils import Esp_flasherError, load_config
+from esp_flasher.config import load_config
+from esp_flasher.core.errors import EspFlasherError
 
 
 def run_esp_flasher(port, firmware, baud_rate=115200):
@@ -72,6 +73,6 @@ def run_esp_flasher(port, firmware, baud_rate=115200):
             burn_and_protect_security_efuses(port)
 
     except esptool.FatalError as err:
-        raise Esp_flasherError(f"Error while writing flash: {err}")
+        raise EspFlasherError(f"Error while writing flash: {err}")
     except Exception as e:
         print("Flash error:", e)

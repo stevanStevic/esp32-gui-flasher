@@ -2,9 +2,9 @@ from PyQt5.QtWidgets import QGroupBox, QGridLayout, QLabel, QPushButton, QFileDi
 
 
 class FirmwareSection(QGroupBox):
-    def __init__(self, parent):
+    def __init__(self, state):
         super().__init__("Firmware")
-        self.parent = parent
+        self.state = state
         self.init_ui()
 
     def init_ui(self):
@@ -14,8 +14,11 @@ class FirmwareSection(QGroupBox):
         self.firmware_button = QPushButton("Browse")
         self.firmware_button.clicked.connect(self.pick_file)
 
+        self.flash_button = QPushButton("Flash ESP")
+
         layout.addWidget(firmware_label, 0, 0)
         layout.addWidget(self.firmware_button, 0, 1)
+        layout.addWidget(self.flash_button, 1, 0, 1, 2)
 
         self.setLayout(layout)
 
@@ -29,5 +32,5 @@ class FirmwareSection(QGroupBox):
             options=options,
         )
         if file_name:
-            self.parent._firmware = file_name
+            self.state.firmware = file_name
             self.firmware_button.setText(file_name)

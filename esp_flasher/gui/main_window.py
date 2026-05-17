@@ -1,27 +1,31 @@
 import sys
+import logging
+import traceback
+
 from PyQt5.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,  # Add QHBoxLayout
+    QHBoxLayout,
     QGroupBox,
     QTextEdit,
 )
 from PyQt5.QtGui import QIcon, QColor, QPalette
 from PyQt5.QtWidgets import QMessageBox
 
-from esp_flasher.gui.printer_config import PrinterConfig
 from esp_flasher.gui.port_config import PortConfig
-from esp_flasher.gui.backend_config import BackendConfig
 from esp_flasher.gui.chip_info import ChipInfoSection
 from esp_flasher.gui.firmware_section import FirmwareSection
 from esp_flasher.gui.actions_section import ActionsSection
-from esp_flasher.helpers.utils import load_config
+from esp_flasher.gui.module_loader import load_modules
+from esp_flasher.gui.app_state import AppState
+from esp_flasher.config import load_config
 from esp_flasher.core.const import __version__
-import logging
-from esp_flasher.helpers.log_handler import FlashLogHandler, StdoutRedirector
-from esp_flasher.model.test_module import TestModule
+from esp_flasher.gui.log_handler import FlashLogHandler, StdoutRedirector
+from esp_flasher.model.test_module import DeviceTestModule
 from esp_flasher.helpers.resource_helper import resource_path
+
+logger = logging.getLogger(__name__)
 
 
 def show_popup(title, message, icon, parent=None):
@@ -35,108 +39,79 @@ def show_popup(title, message, icon, parent=None):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, module_paths=None):
         super().__init__()
-        import sys
-        import traceback
 
         def excepthook(type, value, tb):
             traceback.print_exception(type, value, tb)
-            # Optionally, call the default handler:
             sys.__excepthook__(type, value, tb)
 
         sys.excepthook = excepthook
 
-        self._firmware = None
-        self._chip_port = None
-        self._printer_port = None
-        self._api_endpoint = ""
-        self._api_key = ""
-        self._api_secret = ""
-        self._mac_address = None
-        self._device_name = ""
-        self._successful_flash_count = 0  # Add this line
-        self._testing_enabled = False  # Add this line
-        self._test_board_xth_occurrence = 0  # Add this line
-        self._test_success_regex = ""  # Add this line
-        self._is_testing_active = False  # Add this line to track testing state
-        self._test_timeout_seconds = 30  # Default timeout
-        # Load config and instantiate model after config is loaded
-        self.test_module = None  # Will be set after config
+        self._module_paths = module_paths or []
+        self._modules = []
+        self.testing_popup = None
+
+        # Centralised application state
+        self.state = AppState()
 
         self.init_ui()
+
+        # Wire UI callbacks into state
+        self.state.console = self.console
+        self.state.set_log_file = self.set_log_file
+        self.state.close_log_file = self.close_log_file
+        self.state.show_error_popup = self.show_error_popup
+        self.state.show_success_popup = self.show_success_popup
+        self.state.show_testing_popup = self.show_testing_popup
+        self.state.close_testing_popup = self.close_testing_popup
 
         self.log_handler = FlashLogHandler(text_edit=None)
         logging.basicConfig(level=logging.INFO, handlers=[self.log_handler])
         logging.getLogger().addHandler(self.log_handler)
-        self.log_handler.text_edit = self.console  # Attach after QTextEdit is created
+        self.log_handler.text_edit = self.console
         sys.stdout = StdoutRedirector(logging.getLogger(), logging.INFO)
         sys.stderr = StdoutRedirector(logging.getLogger(), logging.ERROR)
 
-        self.apply_config_to_gui()  # Load configuration into GUI
+        self.apply_config_to_gui()
         self.apply_dark_theme()
 
     def apply_config_to_gui(self):
         """Applies loaded config values to GUI elements."""
         config = load_config()
 
-        # Apply printer settings
-        printer_settings = config.get("printer_settings", {})
-        self.printer_config.printer_combobox.setCurrentText(
-            printer_settings.get("default_printer", "")
-        )
-        self.printer_config.width_spinbox.setValue(
-            printer_settings.get("label_width", 62)
-        )
-        self.printer_config.font_size_spinbox.setValue(
-            printer_settings.get("font_size", 20)
-        )
-        self.printer_config.rotation_spinbox.setValue(
-            printer_settings.get("text_rotation", 270)
-        )
-        self.printer_config.x_offset_spinbox.setValue(
-            printer_settings.get("x_offset", 100)
-        )
-        self.printer_config.y_offset_spinbox.setValue(
-            printer_settings.get("y_offset", 100)
-        )
+        # Let each loaded module apply its own config
+        for module in self._modules:
+            try:
+                module.apply_config(config)
+            except Exception as exc:
+                logger.error(f"Module '{module.get_name()}' failed to apply config: {exc}")
 
         # Apply chip port and firmware path
         self.port_config.chip_port_combobox.setCurrentText(config.get("chip_port", ""))
-        self._firmware = config.get("firmware_path", "")
-        self.firmware_section.firmware_button.setText(self._firmware)
-
-        # Apply API settings
-        api_settings = config.get("api_settings", {})
-        self.backend_config.line_edits["_api_endpoint"].setText(
-            api_settings.get("api_endpoint", "")
-        )
-        self.backend_config.line_edits["_api_key"].setText(
-            api_settings.get("api_key", "")
-        )
-        self.backend_config.line_edits["_api_secret"].setText(
-            api_settings.get("api_secret", "")
-        )
+        self.state.firmware = config.get("firmware_path", "")
+        self.firmware_section.firmware_button.setText(self.state.firmware)
 
         # Apply testing settings
         testing_settings = config.get("testing_settings", {})
-        self._testing_enabled = testing_settings.get("enabled", False)
-        self._test_board_xth_occurrence = testing_settings.get(
+        testing_enabled = testing_settings.get("enabled", False)
+        test_board_xth_occurrence = testing_settings.get(
             "test_board_xth_occurrence", 0
         )
-        self._test_success_regex = testing_settings.get("test_success_regex", "")
-        self._test_timeout_seconds = testing_settings.get("test_timeout_seconds", 200)
+        test_success_regex = testing_settings.get("test_success_regex", "")
+        test_timeout_seconds = testing_settings.get("test_timeout_seconds", 200)
 
         # Instantiate the model with latest config
-        self.test_module = TestModule(
-            self._test_success_regex,
-            self._test_timeout_seconds,
-            self._testing_enabled,
-            self._test_board_xth_occurrence,
+        self.state.test_module = DeviceTestModule(
+            test_success_regex,
+            test_timeout_seconds,
+            testing_enabled,
+            test_board_xth_occurrence,
         )
 
     def init_ui(self):
-        self.setWindowTitle(f"ESP32-GUI-Flasher with Printer Support {__version__}")
+        title = f"ESP32-GUI-Flasher {__version__}"
+        self.setWindowTitle(title)
         self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(resource_path("icon.ico")))
 
@@ -150,20 +125,39 @@ class MainWindow(QMainWindow):
         left_layout_widget = QWidget()
         left_layout = QVBoxLayout()
 
-        self.port_config = PortConfig(self)
-        self.printer_config = PrinterConfig(self)
-        self.backend_config = BackendConfig(self)
-        self.chip_info_section = ChipInfoSection(self)
-        self.firmware_section = FirmwareSection(self)
-        self.actions_section = ActionsSection(self)
+        self.port_config = PortConfig(self.state)
+        self.chip_info_section = ChipInfoSection(self.state)
+        self.firmware_section = FirmwareSection(self.state)
+        self.actions_section = ActionsSection(self.state)
 
+        # Connect the flash button (now in firmware_section) to actions_section.flash_esp
+        self.firmware_section.flash_button.clicked.connect(self.actions_section.flash_esp)
+
+        # Order: Port Config -> Chip Info -> [Loaded Modules] -> Firmware -> Actions
         left_layout.addWidget(self.port_config)
-        left_layout.addWidget(self.printer_config)
-        left_layout.addWidget(self.backend_config)
         left_layout.addWidget(self.chip_info_section)
+
+        # Load and insert extension modules
+        if self._module_paths:
+            try:
+                self._modules = load_modules(self._module_paths)
+            except Exception as exc:
+                logger.error(f"Failed to load modules: {exc}")
+                self._modules = []
+
+            for module in self._modules:
+                try:
+                    section = module.create_section(self.state)
+                    left_layout.addWidget(section)
+                    logger.info(f"Module section added: {module.get_name()}")
+                except Exception as exc:
+                    logger.error(
+                        f"Module '{module.get_name()}' failed to create section: {exc}"
+                    )
+
         left_layout.addWidget(self.firmware_section)
         left_layout.addWidget(self.actions_section)
-        left_layout.addStretch()  # Add stretch to push widgets to the top
+        left_layout.addStretch()
         left_layout_widget.setLayout(left_layout)
 
         # Console on the right
@@ -175,8 +169,8 @@ class MainWindow(QMainWindow):
         self.console_group_box.setLayout(console_layout)
 
         # Add left and right sections to the main layout
-        main_layout.addWidget(left_layout_widget, 1)  # Assign a stretch factor of 1
-        main_layout.addWidget(self.console_group_box, 1)  # Assign a stretch factor of 1
+        main_layout.addWidget(left_layout_widget, 1)
+        main_layout.addWidget(self.console_group_box, 1)
 
         central_widget.setLayout(main_layout)
 
@@ -199,7 +193,7 @@ class MainWindow(QMainWindow):
 
     def show_testing_popup(self, message):
         """Displays a non-blocking informational popup indicating that testing is in progress."""
-        if hasattr(self, "testing_popup") and self.testing_popup is not None:
+        if self.testing_popup is not None:
             self.testing_popup.close()
         self.testing_popup = QMessageBox(self)
         self.testing_popup.setIcon(QMessageBox.Warning)
@@ -211,7 +205,7 @@ class MainWindow(QMainWindow):
 
     def close_testing_popup(self):
         """Closes the testing popup if it is open and visible."""
-        if hasattr(self, "testing_popup") and self.testing_popup is not None:
+        if self.testing_popup is not None:
             try:
                 if self.testing_popup.isVisible():
                     self.testing_popup.done(0)  # Force close
@@ -234,3 +228,12 @@ class MainWindow(QMainWindow):
     def close_log_file(self):
         if self.log_handler:
             self.log_handler.close()
+
+    def closeEvent(self, event):
+        """Dispose all loaded modules before closing."""
+        for module in self._modules:
+            try:
+                module.dispose()
+            except Exception as exc:
+                logger.error(f"Module '{module.get_name()}' dispose failed: {exc}")
+        super().closeEvent(event)

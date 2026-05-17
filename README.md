@@ -8,11 +8,18 @@ Non-essential options are hidden, making the process accessible for beginners wh
 - [ESP32 GUI Flasher – Easy Firmware Flashing with Label Printing](#esp32-gui-flasher--easy-firmware-flashing-with-label-printing)
   - [Overview](#overview)
     - [Why use ESP32 GUI Flasher?](#why-use-esp32-gui-flasher)
+  - [Architecture](#architecture)
   - [Features](#features)
   - [Installation and Setup](#installation-and-setup)
     - [Using the Pre-Built Binary (Windows)](#using-the-pre-built-binary-windows)
     - [Running from Source (All Platforms)](#running-from-source-all-platforms)
     - [Building a Standalone Executable (Not fully tested for Linux and MacOS)](#building-a-standalone-executable-not-fully-tested-for-linux-and-macos)
+  - [CLI Usage](#cli-usage)
+    - [Global Options](#global-options)
+    - [info — Read Chip Information](#info--read-chip-information)
+    - [flash — Flash Firmware](#flash--flash-firmware)
+    - [logs — Stream Device Logs](#logs--stream-device-logs)
+    - [test — Flash & Run Log-Based Test](#test--flash--run-log-based-test)
   - [Printer Integration (Brother QL-600)](#printer-integration-brother-ql-600)
     - [Supported Printer](#supported-printer)
     - [Windows Driver Setup](#windows-driver-setup)
@@ -29,6 +36,12 @@ Non-essential options are hidden, making the process accessible for beginners wh
   - [Automated Testing and Log File Management](#automated-testing-and-log-file-management)
     - [Automated Device Testing](#automated-device-testing)
     - [Log File Handling During Testing](#log-file-handling-during-testing)
+  - [Extending with GUI Modules](#extending-with-gui-modules)
+    - [What is a GUI Module?](#what-is-a-gui-module)
+    - [Creating a Minimal Module](#creating-a-minimal-module)
+    - [GUIModule API Reference](#guimodule-api-reference)
+    - [Loading Your Module](#loading-your-module)
+    - [Reference Implementation](#reference-implementation)
   - [Configuration and Options](#configuration-and-options)
     - [Configuration File (`config.json`)](#configuration-file-configjson)
     - [Secure vs. Regular Firmware Flashing](#secure-vs-regular-firmware-flashing)
@@ -54,6 +67,19 @@ ESP32 GUI Flasher is designed to make firmware updates for ESP32-based hardware 
 * **Device Info & Registration:** It can retrieve the device’s chip info (like MAC address) and, if configured, register the device with a backend service using a provided API. This is useful for assigning or recording device IDs in an IoT deployment.
 * **Label Printing:** Optionally connect a Brother QL-600 label printer to print a label for each device immediately after flashing, containing info like the device name or ID. This helps with physical labeling of devices. The printer integration is optional – the flasher works fine without a printer connected.
 
+## <a name="architecture"></a>Architecture
+
+The application is split into a **CLI layer** (headless, scriptable) and a **GUI layer** (interactive, PyQt5-based). Both share the same **core** library for chip detection, flashing, and serial I/O.
+
+![Architecture Diagram](images/architecture.png)
+
+**Key design points:**
+
+* **CLI handlers** (`cli/handlers.py`) are thin wrappers — they call the core library directly, contain no UI or threading logic, and return simple values.
+* **GUI sections** each own a `QGroupBox` and communicate through a shared `AppState` object (never reaching into `MainWindow` internals).
+* **GUI Modules** are loaded dynamically at startup via `--load-module`. They receive the `AppState` and insert their own `QGroupBox` between the Chip Info and Firmware sections.
+* **Background threads** (`gui/threads/`) keep the UI responsive — flashing, chip detection, log streaming, and testing each run in dedicated `QThread` subclasses.
+
 ## <a name="features"></a>Features
 
 Some of the core functionalities and benefits of ESP32 GUI Flasher include:
@@ -65,7 +91,7 @@ Some of the core functionalities and benefits of ESP32 GUI Flasher include:
 * **Serial Port Detection:** Lists available serial ports (COM ports on Windows, `/dev/tty*` on Linux) for easy selection. A refresh button lets you detect newly plugged devices.
 * **Cross-Platform Printing:** Integrates with the Brother QL series label printers (specifically tested on QL-600) for printing device labels. This uses the [`brother_ql`](https://pypi.org/project/brother-ql/) Python library to send print jobs directly to the printer (via USB or spooler).
 * **Test Print Function:** Allows you to print a test label with custom text to verify printer settings (label alignment, offsets, etc.) before mass printing.
-* **Device Registration Workflow:** Provides fields to input a REST API endpoint, API key, and secret. After flashing, you can fetch a device name or register the device in your system by clicking **Register**, then print a label with that name via **Print** – all within the tool.
+* **Device Registration Workflow:** Provides fields to input a REST API endpoint, API key, and secret. After flashing, you can fetch a device name or register the device in your system by clicking **Register Device**, then print a label with that name via **Print** – all within the tool.
 * **Console Output & Logs:** A built-in console pane shows esptool output, success/error messages, and can stream device logs (after flashing, if you connect to serial logs).
 * **MIT Licensed:** Completely open source ([MIT license](https://github.com/stevanStevic/esp32-gui-flasher/blob/main/LICENSE)) – you can modify and integrate it into your own workflow or contribute improvements.
 
@@ -140,6 +166,184 @@ While not explicitly documented, you can attempt to use PyInstaller on macOS as 
 
 After building, you can distribute the resulting binary. Remember that on Linux/macOS, the user may need to mark the file as executable (`chmod +x ESP32-Flasher`) before running it.
 
+## <a name="cli-usage"></a>CLI Usage
+
+The tool provides a full CLI for headless / CI / scripted workflows. All commands are accessed via:
+
+```bash
+python -m esp_flasher <command> [options]
+```
+
+Run `python -m esp_flasher --help` for a summary of all commands.
+
+### <a name="global-options"></a>Global Options
+
+| Flag | Description |
+|---|---|
+| `--gui` | Launch the graphical interface. All subcommands are ignored when this is set. |
+| `--load-module PATH` | (GUI only) Path to a GUIModule plugin file or package. May be repeated. |
+
+**Example — launch the GUI with an extension module:**
+
+```bash
+python -m esp_flasher --gui --load-module esp_flasher/modules/registration_printing
+```
+
+---
+
+### <a name="info--read-chip-information"></a>`info` — Read Chip Information
+
+Connects to the ESP chip and prints identification data (family, model, MAC address, core count, etc.).
+
+```bash
+python -m esp_flasher info -p <PORT>
+```
+
+**Example:**
+
+```bash
+# Linux
+python -m esp_flasher info -p /dev/ttyUSB0
+
+# Windows
+python -m esp_flasher info -p COM3
+```
+
+**Sample output:**
+
+```
+Chip Information:
+  Chip Family : ESP32
+  Model       : ESP32-D0WDQ6 (revision 1)
+  MAC Address : DC:B4:D9:0A:C2:E8
+  Cores       : 2
+  CPU Freq    : 240MHz
+  Bluetooth   : YES
+  Embed Flash : NO
+  Calibr. ADC : NO
+```
+
+---
+
+### <a name="flash--flash-firmware"></a>`flash` — Flash Firmware
+
+Writes a firmware release ZIP (containing `flasher_args.json` + binaries) onto the chip.
+
+```bash
+python -m esp_flasher flash -p <PORT> --firmware <ZIP_PATH> [--baud <RATE>]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `-p, --port` | *(required)* | Serial port |
+| `--firmware` | *(required)* | Path to the firmware `.zip` file |
+| `--baud` | `460800` | Upload baud rate |
+
+**Examples:**
+
+```bash
+# Flash with default baud rate
+python -m esp_flasher flash -p /dev/ttyUSB0 --firmware release_v2.1.0.zip
+
+# Flash with a slower baud rate (useful for long USB cables)
+python -m esp_flasher flash -p /dev/ttyUSB0 --firmware release_v2.1.0.zip --baud 115200
+
+# Windows
+python -m esp_flasher flash -p COM3 --firmware C:\firmware\release_v2.1.0.zip
+```
+
+On success the output ends with:
+
+```
+Flashing completed successfully.
+```
+
+---
+
+### <a name="logs--stream-device-logs"></a>`logs` — Stream Device Logs
+
+Opens the serial port and prints every line the device sends. Blocks until you press **Ctrl+C**.
+
+```bash
+python -m esp_flasher logs -p <PORT>
+```
+
+**Example:**
+
+```bash
+python -m esp_flasher logs -p /dev/ttyUSB0
+```
+
+```
+Streaming logs from /dev/ttyUSB0  (Ctrl+C to stop) …
+I (234) cpu_start: Starting app cpu, entry point is 0x40081234
+I (236) heap_init: Initializing. RAM available for dynamic allocation:
+…
+^C
+Log streaming stopped.
+```
+
+---
+
+### <a name="test--flash--run-log-based-test"></a>`test` — Flash & Run Log-Based Test
+
+A combined command that **flashes** the firmware and then **watches the serial output** for a regex pattern within a timeout. Useful in CI pipelines and production-line testing.
+
+```bash
+python -m esp_flasher test -p <PORT> --firmware <ZIP> --regex <PATTERN> --timeout <SECONDS> [--baud <RATE>]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `-p, --port` | *(required)* | Serial port |
+| `--firmware` | *(required)* | Path to the firmware `.zip` file |
+| `--regex` | *(required)* | Python regex pattern to search for in device logs |
+| `--timeout` | *(required)* | Seconds to wait for a match before declaring failure |
+| `--baud` | `460800` | Upload baud rate |
+
+**Examples:**
+
+```bash
+# Flash and wait up to 30 s for the device to print "Wi-Fi connected"
+python -m esp_flasher test \
+    -p /dev/ttyUSB0 \
+    --firmware release_v2.1.0.zip \
+    --regex "Wi-Fi connected" \
+    --timeout 30
+
+# Use a regex with alternation
+python -m esp_flasher test \
+    -p /dev/ttyUSB0 \
+    --firmware release_v2.1.0.zip \
+    --regex "PASS|ALL TESTS OK" \
+    --timeout 60
+```
+
+**Pass output:**
+
+```
+Step 1/2: Flashing firmware …
+Flashing completed successfully.
+Step 2/2: Watching logs for /Wi-Fi connected/ (timeout 30s) …
+I (1023) wifi: connected to AP
+I (1045) main: Wi-Fi connected
+
+✅ PASS — pattern matched.
+```
+
+**Fail output (timeout):**
+
+```
+Step 1/2: Flashing firmware …
+Flashing completed successfully.
+Step 2/2: Watching logs for /Wi-Fi connected/ (timeout 5s) …
+I (1023) wifi: scanning...
+
+❌ FAIL — timeout expired without a match.
+```
+
+The process exits with code **0** on pass and **1** on failure, making it easy to integrate with CI systems.
+
 ## <a name="printer-integration-brother-ql-600"></a>Printer Integration (Brother QL-600)
 
 One standout feature of this flasher is the ability to print labels for flashed devices using a Brother QL-600 label printer. This integration is optional – you can flash firmware without ever connecting a printer. But if you do use it, here’s how to set up the printer on each platform and configure it in the app.
@@ -202,13 +406,13 @@ Keep in mind that label printing in this tool is primarily designed for printing
 
 ## <a name="using-the-esp32-gui-flasher"></a>Using the ESP32 GUI Flasher
 
-When you launch the ESP32 GUI Flasher, you will see the main window divided into sections for Firmware, Chip Port, Backend Connection, Printer Setup, Chip Info, and an action button to flash. There’s also a console output area at the bottom that shows logs and messages.
+When you launch the ESP32 GUI Flasher, you will see the main window divided into sections on the left and a **Console** output area on the right. The left panel contains (from top to bottom): **Chip Port Configuration**, **Chip Info**, any **loaded modules** (e.g. Device Registration and Printing), **Firmware**, and **Actions**.
 
-Here we’ll describe each field/control and how to use it, as well as the general workflow for flashing and printing.
+Here we'll describe each field/control and how to use it, as well as the general workflow for flashing and printing.
 
 ### <a name="selecting-firmware-zip-package"></a>Selecting Firmware (ZIP Package)
 
-The first step is to select your firmware file. In the top section labeled **Firmware**, click the **Browse** button. A file dialog will open, filtered to show `.zip` files. Navigate to your firmware release zip and select it.
+To select your firmware file, go to the **Firmware** section and click the **Select Firmware** button. A file dialog will open, filtered to show `.zip` files. Navigate to your firmware release zip and select it.
 
 You can package the release ZIP with [this script](./scripts/create_release.py). You shall run this script within your project repository after building it with your preferences, even including secure and encrypted build.
 
@@ -219,7 +423,7 @@ You can package the release ZIP with [this script](./scripts/create_release.py).
 * Optionally, encryption keys or other files if needed by your process, though typically not – the `flasher_args` will reference everything needed.
 
 
-When you select the zip, the GUI’s firmware button text will change to the filename, indicating it’s loaded. Internally, the tool reads the `flasher_args.json` from the ZIP. All required fields for flashing (addresses, etc.) are now set in memory. You do not need to specify anything else about the firmware.
+When you select the zip, the button text will change to the file path, indicating it's loaded. Internally, the tool reads the `flasher_args.json` from the ZIP. All required fields for flashing (addresses, etc.) are now set in memory. You do not need to specify anything else about the firmware.
 
 If you selected a zip that does not contain the expected files, the flashing process may fail. Always use the exact output zip from your firmware build. (In ESP-IDF you can create this by running `idf.py archive-flash` or manually zipping the build directory’s flasher files.)
 
@@ -255,37 +459,37 @@ If you intend to use the **Register** feature (described below), fill these in:
 
 The API Key/Secret fields are masked (they won’t show the text as you type, for security). The values you enter here get saved to a config file so you don’t have to re-enter each time (discussed in [Configuration File](#configuration-file-configjson)).
 
-If you are not using any backend service, you can leave these fields blank. The **Register** and **Print** buttons in **Chip Info** section will then prompt you to fill these if you click them, but if you’re not using them, it won’t affect the flashing process at all.
+If you are not using any backend service, you can leave these fields blank. The **Register Device** and **Print** buttons in the **Device Registration and Printing** module section will then prompt you to fill these if you click them, but if you're not using them, it won't affect the flashing process at all.
 
 ### <a name="chip-info-and-device-registration"></a>Chip Info and Device Registration
 
-The **Chip Info** section contains three buttons: **Get Device Info**, **Register**, and **Print** (not to be confused with the **Test Print** in the **Printer** section).
+The **Chip Info** section contains the **Get Device Info** button. The **Register Device** and **Print** buttons are part of the **Device Registration and Printing** module (loaded separately — see [Extending with GUI Modules](#extending-with-gui-modules)).
 
-* **<a name="get-device-info"></a>Get Device Info:** This button will retrieve information from the connected ESP32. Specifically, it runs a command to get the unique MAC address of the ESP32 (and possibly other chip data). When you click this, ensure a port is selected and the device is connected/powered. The tool will clear the console and start a background thread to read the chip info. After a moment, you should see the ESP32 MAC address (and other details) printed in the console or a success message. Internally, the MAC address is stored in the tool,. If no port was selected, you’ll get an error prompt “Device port is missing!”,.
+* **<a name="get-device-info"></a>Get Device Info:** This button will retrieve information from the connected ESP32. Specifically, it runs a command to get the unique MAC address of the ESP32 (and possibly other chip data). When you click this, ensure a port is selected and the device is connected/powered. The tool will clear the console and start a background thread to read the chip info. After a moment, you should see the ESP32 MAC address (and other details) printed in the console or a success message. Internally, the MAC address is stored in the shared `AppState`. If no port was selected, you'll get an error prompt "Device port is missing!".
 
-    This step is mainly needed if you plan to register/label the device. It’s not strictly required just to flash firmware. However, it’s a good idea to do it because the MAC address can confirm that the tool is communicating with the chip properly. It uses `esptool`’s features to read efuse info for MAC.
+    This step is mainly needed if you plan to register/label the device. It's not strictly required just to flash firmware. However, it's a good idea to do it because the MAC address can confirm that the tool is communicating with the chip properly. It uses `esptool`'s features to read efuse info for MAC.
 
-* **<a name="register"></a>Register:** This button will attempt to register the device in your backend system using the API details you provided. When clicked, it checks that API Endpoint/Key/Secret are all provided and that a MAC address has been obtained (you ran **Get Device Info** first). If any of those are missing, it will show an error (e.g., “API endpoint and/or credentials are missing” or “No MAC address found! Click 'Get Device Info' first.”). Assuming all is set, the tool will start a background `RegisterThread` to call your API. The exact behavior depends on your API – you would likely customize this part of the code to fit your service. In general, the thread would send the MAC (and possibly other info) to the API and expect a device name or confirmation in response.
+* **<a name="register"></a>Register Device:** This button (in the **Device Registration and Printing** module section) will attempt to register the device in your backend system using the API details you provided. When clicked, it checks that API Endpoint/Key/Secret are all provided and that a MAC address has been obtained (you ran **Get Device Info** first). If any of those are missing, it will show an error (e.g., "API endpoint and/or credentials are missing" or "No MAC address found! Click 'Get Device Info' first."). Assuming all is set, the tool will start a background `RegisterThread` to call your API. The exact behavior depends on your API – you would likely customize this part of the code to fit your service. In general, the thread would send the MAC (and possibly other info) to the API and expect a device name or confirmation in response.
 
-    If successful, the `RegisterThread` should emit a `device_name_signal` which the GUI handles to store the device name and display a message “Device Registered: \[name]”,. Now the tool knows the friendly name of the device.
+    If successful, the `RegisterThread` should emit a `device_name_signal` which the GUI handles to store the device name and display a message "Device Registered: [name]". Now the tool knows the friendly name of the device.
 
-    If you are not using an API, you can ignore the **Register** button. Alternatively, you could repurpose it: for instance, configure a dummy endpoint that just returns a standardized name or use it in offline mode. But typically, skip if not needed.
+    If you are not using an API, you can ignore the **Register Device** button. Alternatively, you could repurpose it: for instance, configure a dummy endpoint that just returns a standardized name or use it in offline mode. But typically, skip if not needed.
 
-* **<a name="print-device-label"></a>Print (Device Label):** This **Print** button in **Chip Info** is used to print a label for the device after registration. It assumes you have:
+* **<a name="print-device-label"></a>Print (Device Label):** The **Print** button in the **Device Registration and Printing** module section is used to print a label for the device after registration. It assumes you have:
 
     * Selected a printer (Printer Setup done),
-    * Obtained a device name via **Register**,
-    * Or alternatively, you manually set the "Print Text" and use **Test Print** button (if you’re not using the API, the tool doesn’t know what text to print on the label via this button).
+    * Obtained a device name via **Register Device**,
+    * Or alternatively, you manually set the "Print Text" and use the **Test Print** button (if you're not using the API, the tool doesn't know what text to print on the label via this button).
 
-    When you click **Print**, it will check that a printer is selected and a device name is available,. If not, you get an error (e.g., “No printer port selected!” or “Device name not obtained, first Register the device.”),. If all is well, it gathers the current printer settings (width, rotation, offsets, font) from the **Printer Setup** section and starts a print job (similar to the **Test Print**, but using the stored device name as the text),. This runs in a thread and will show a success or error message accordingly (usually “Print job sent successfully.” on success).
+    When you click **Print**, it will check that a printer is selected and a device name is available. If not, you get an error (e.g., "No printer port selected!" or "Device name not obtained, first Register the device."). If all is well, it gathers the current printer settings (width, rotation, offsets, font) from the **Printer Setup** area and starts a print job (similar to the **Test Print**, but using the stored device name as the text). This runs in a thread and will show a success or error message accordingly (usually "Print job sent successfully." on success).
 
-    Essentially, this is the one-click final step to label your device with the assigned name after flashing and registering. If you didn’t use the **Register** feature, you can’t use this button to print a name (since no `_device_name` exists). In that case, use the **Test Print** in **Printer Setup** to print a custom text label – for example, you could manually type the device’s MAC or any identifier in the text field and print it.
+    Essentially, this is the one-click final step to label your device with the assigned name after flashing and registering. If you didn't use the **Register Device** feature, you can't use this button to print a name (since no device name exists). In that case, use the **Test Print** in **Printer Setup** to print a custom text label – for example, you could manually type the device's MAC or any identifier in the text field and print it.
 
 ### <a name="flashing-the-esp32"></a>Flashing the ESP32
 
 With firmware selected and the serial port chosen, you’re ready to flash:
 
-* Click the **Flash ESP** button (sometimes labeled just “Flash” or “Flash ESP32” depending on the version). The tool will respond by first ensuring no flash operation is already running (to avoid duplicates). Then it will print “Starting flashing process...” in the console.
+* Click the **Flash ESP** button. The tool will respond by first ensuring no flash operation is already running (to avoid duplicates). Then it will print "Starting flashing process..." in the console.
 * The flashing runs in a background thread to keep the GUI responsive. You’ll see output similar to `esptool`’s logs in the console area. This includes messages like connecting, erasing flash (if applicable), writing each segment, and the progress percentages. All the necessary addresses and files are fed to `esptool` according to the `flasher_args.json` – you don’t have to worry about any offsets.
 * **Do not disconnect power or reset the board during this process.** It typically takes a few seconds to a minute, depending on the size of your firmware and the baud rate used (the tool by default uses a high baud rate like 460800 or 921600 for ESP32).
 * On completion, you will see a success message or an error:
@@ -293,7 +497,7 @@ With firmware selected and the serial port chosen, you’re ready to flash:
     * If there’s an error (e.g., unable to connect, or a file not found), an error message will be shown. Common issues could be wrong port, device not in bootloader mode, or incorrect firmware package format.
 * After a successful flash, the ESP32 will reset and boot into the new firmware.
 
-If the firmware you flashed starts sending logs to UART, you can click a **View Logs** button to begin a log thread that prints serial output to the console in real-time. This is helpful to verify the firmware is running as expected. The log thread can be stopped as well. (This functionality is similar to running `idf.py monitor` or `esptool.py --monitor`). If your version of the tool has the **ViewLogs** button, use it after flashing to see device output.
+If the firmware you flashed starts sending logs to UART, you can click the **View Logs** button in the **Actions** section to begin a log thread that prints serial output to the console in real-time. This is helpful to verify the firmware is running as expected. Click **Stop Logs** to end the stream. You can also click **Test Device** to manually trigger a log-based test at any time. (This functionality is similar to running `idf.py monitor` or `esptool.py --monitor`.)
 
 ### <a name="printing-a-device-label-1"></a>Printing a Device Label
 
@@ -302,12 +506,12 @@ This step is optional and only applicable if you have the printer connected and 
 If you followed the earlier sections:
 
 * You got the MAC address via **Get Device Info**.
-* You clicked **Register** and the tool acquired a Device Name (for example, “Device-42”) from your system.
+* You clicked **Register Device** and the tool acquired a Device Name (for example, "Device-42") from your system.
 * You have the Printer selected and configured.
 
-Now simply click **Print** in the **Chip Info** section. The label should print out with the device’s name.
+Now simply click **Print** in the **Device Registration and Printing** module section. The label should print out with the device's name.
 
-If you are not using the **Register** feature but still want to print a label:
+If you are not using the **Register Device** feature but still want to print a label:
 
 * Enter the text you want in the **Print Text** field under **Printer Setup**.
 * Click **Test Print** which effectively prints that text with the current settings.
@@ -332,6 +536,140 @@ User flashes device; a `flashing_<timestamp>.log` file is created.
   - The log file is opened and set as the active log destination at the start of testing.
   - All log output during the test is written to this file.
   - When the test ends, the log file is closed and logging returns to its default state.
+
+## <a name="extending-with-gui-modules"></a>Extending with GUI Modules
+
+The GUI supports a plug-in system that lets you add custom sections to the main window without modifying the core codebase.
+
+### <a name="what-is-a-gui-module"></a>What is a GUI Module?
+
+A GUI Module is a Python class that inherits from `esp_flasher.gui.module_base.GUIModule`. It provides a `QGroupBox` widget that the main window inserts between the **Chip Info** and **Firmware** sections. Modules receive the shared `AppState` object, giving them access to the current MAC address, serial port, firmware path, console widget, and popup callbacks.
+
+### <a name="creating-a-minimal-module"></a>Creating a Minimal Module
+
+Create a single `.py` file anywhere on your system (e.g. `my_module.py`):
+
+```python
+from esp_flasher.gui.module_base import GUIModule
+from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QLabel, QPushButton
+
+
+class HelloModule(GUIModule):
+    """A minimal example module."""
+
+    def get_name(self) -> str:
+        return "Hello Module"
+
+    def create_section(self, state) -> QGroupBox:
+        box = QGroupBox("Hello")
+        layout = QVBoxLayout()
+
+        label = QLabel("Hello from a custom module!")
+        layout.addWidget(label)
+
+        # Example: use AppState to show the current MAC address
+        btn = QPushButton("Show MAC")
+        btn.clicked.connect(
+            lambda: state.show_success_popup(
+                f"MAC: {state.mac_address or 'N/A'}"
+            )
+        )
+        layout.addWidget(btn)
+
+        box.setLayout(layout)
+        return box
+```
+
+Launch with:
+
+```bash
+python -m esp_flasher --gui --load-module /path/to/my_module.py
+```
+
+The module's section will appear in the left panel between Chip Info and Firmware.
+
+### <a name="guimodule-api-reference"></a>GUIModule API Reference
+
+| Method | Required | Description |
+|---|---|---|
+| `get_name() -> str` | **Yes** | Human-readable name (used in log messages). |
+| `create_section(state) -> QGroupBox` | **Yes** | Build and return the widget for your module. `state` is an `AppState` instance. |
+| `apply_config(config: dict) -> None` | No | Called after `create_section()` with the loaded `config.json` dict. Use this to restore saved settings. |
+| `dispose() -> None` | No | Cleanup hook called when the main window closes. Stop threads, release resources, or persist state here. |
+
+**`AppState` fields available to modules:**
+
+| Field | Type | Description |
+|---|---|---|
+| `state.firmware` | `str` | Currently selected firmware path. |
+| `state.chip_port` | `str` | Currently selected serial port. |
+| `state.mac_address` | `str \| None` | MAC address of the connected chip (after Get Device Info). |
+| `state.device_name` | `str` | Device name (after registration). |
+| `state.test_module` | `DeviceTestModule` | Testing configuration model. |
+| `state.module_data` | `dict` | Generic dict for modules to store per-module data without coupling. |
+| `state.console` | `QTextEdit` | The console output widget. |
+| `state.show_error_popup(msg)` | callback | Display an error dialog. |
+| `state.show_success_popup(msg)` | callback | Display a success dialog. |
+| `state.set_log_file(path)` | callback | Redirect log output to a file. |
+| `state.close_log_file()` | callback | Stop file logging. |
+
+### <a name="loading-your-module"></a>Loading Your Module
+
+Modules can be a single `.py` file **or** a Python package directory (a folder with `__init__.py`). Use `--load-module` one or more times:
+
+```bash
+# Single file
+python -m esp_flasher --gui --load-module /path/to/my_module.py
+
+# Package directory
+python -m esp_flasher --gui --load-module /path/to/my_package/
+
+# Multiple modules
+python -m esp_flasher --gui \
+    --load-module ./modules/module_a.py \
+    --load-module ./modules/module_b/
+```
+
+The loader will:
+1. Resolve the path to a `.py` file (or the `__init__.py` inside a package).
+2. Import it dynamically.
+3. Find the first concrete `GUIModule` subclass.
+4. Instantiate it and add its section to the main window.
+
+### <a name="reference-implementation"></a>Reference Implementation
+
+The built-in **Device Registration and Printing** module is a full-featured example you can study and use as a template. It lives at:
+
+```
+esp_flasher/modules/registration_printing/
+├── __init__.py          # GUIModule subclass (RegistrationPrintingModule)
+├── section.py           # QGroupBox with backend + printer UI
+├── api_client.py        # REST API integration
+├── printer_utils.py     # Printer discovery helpers
+├── printer.py           # Print-job logic
+├── printers/            # Printer backends (Brother, Win)
+│   ├── base_printer.py
+│   ├── brother_printer.py
+│   └── win_printer.py
+└── threads/             # Background threads
+    ├── printing_thread.py
+    └── register_thread.py
+```
+
+This module demonstrates:
+
+* **`get_name()`** — returns `"Device Registration and Printing"`.
+* **`create_section(state)`** — builds a complex section with API fields, printer selection, spin-boxes, and action buttons.
+* **`apply_config(config)`** — restores printer settings and API credentials from `config.json`.
+* **`dispose()`** — gracefully stops running threads on window close.
+* **Background threads** — `RegisterThread` calls an external API; `PrintingThread` sends a label to the printer. Both communicate results back to the UI via Qt signals.
+* **Using `AppState`** — reads `state.mac_address` and `state.chip_port`; writes to `state.device_name` and `state.module_data`.
+
+Load it with:
+
+```bash
+python -m esp_flasher --gui --load-module esp_flasher/modules/registration_printing
+```
 
 ## <a name="configuration-and-options"></a>Configuration and Options
 
